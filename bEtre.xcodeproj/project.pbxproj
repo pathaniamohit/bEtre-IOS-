@@ -17,6 +17,9 @@
 		1815FE4E2CA32ECB009000F9 /* Utils.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1815FE4D2CA32ECB009000F9 /* Utils.swift */; };
 		1815FE502CA32F08009000F9 /* SessionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1815FE4F2CA32F08009000F9 /* SessionManager.swift */; };
 		1815FE522CA32F37009000F9 /* LoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1815FE512CA32F37009000F9 /* LoginView.swift */; };
+		1815FE542CA7575B009000F9 /* ForgotPasswordView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1815FE532CA7575B009000F9 /* ForgotPasswordView.swift */; };
+		1815FE562CA75C71009000F9 /* UserViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1815FE552CA75C71009000F9 /* UserViewModel.swift */; };
+		1815FE582CA76BF8009000F9 /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = 1815FE572CA76BF8009000F9 /* FirebaseFirestore */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -30,6 +33,8 @@
 		1815FE4D2CA32ECB009000F9 /* Utils.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Utils.swift; sourceTree = "<group>"; };
 		1815FE4F2CA32F08009000F9 /* SessionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionManager.swift; sourceTree = "<group>"; };
 		1815FE512CA32F37009000F9 /* LoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginView.swift; sourceTree = "<group>"; };
+		1815FE532CA7575B009000F9 /* ForgotPasswordView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ForgotPasswordView.swift; sourceTree = "<group>"; };
+		1815FE552CA75C71009000F9 /* UserViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserViewModel.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -38,6 +43,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				1815FE4C2CA31F1E009000F9 /* FirebaseAuth in Frameworks */,
+				1815FE582CA76BF8009000F9 /* FirebaseFirestore in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -89,6 +95,8 @@
 				1815FE4D2CA32ECB009000F9 /* Utils.swift */,
 				1815FE4F2CA32F08009000F9 /* SessionManager.swift */,
 				1815FE512CA32F37009000F9 /* LoginView.swift */,
+				1815FE532CA7575B009000F9 /* ForgotPasswordView.swift */,
+				1815FE552CA75C71009000F9 /* UserViewModel.swift */,
 			);
 			path = Authentication;
 			sourceTree = "<group>";
@@ -118,6 +126,7 @@
 			name = bEtre;
 			packageProductDependencies = (
 				1815FE4B2CA31F1E009000F9 /* FirebaseAuth */,
+				1815FE572CA76BF8009000F9 /* FirebaseFirestore */,
 			);
 			productName = bEtre;
 			productReference = 1815FE332CA31AB6009000F9 /* bEtre.app */;
@@ -178,6 +187,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				1815FE522CA32F37009000F9 /* LoginView.swift in Sources */,
+				1815FE562CA75C71009000F9 /* UserViewModel.swift in Sources */,
+				1815FE542CA7575B009000F9 /* ForgotPasswordView.swift in Sources */,
 				1815FE392CA31AB6009000F9 /* ContentView.swift in Sources */,
 				1815FE462CA31AFB009000F9 /* SignUpView.swift in Sources */,
 				1815FE372CA31AB6009000F9 /* bEtreApp.swift in Sources */,
@@ -403,6 +414,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 1815FE492CA31F03009000F9 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
 			productName = FirebaseAuth;
+		};
+		1815FE572CA76BF8009000F9 /* FirebaseFirestore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 1815FE492CA31F03009000F9 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseFirestore;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
