@@ -6,12 +6,20 @@
 //
 
 import SwiftUI
+import FirebaseCore
 
 @main
 struct bEtreApp: App {
+    init() {
+        FirebaseApp.configure()
+        print("Configured Firebase!")
+    }
     var body: some Scene {
+        
         WindowGroup {
             ContentView()
+            
         }
+        
     }
 }

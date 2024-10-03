@@ -5,162 +5,131 @@
 //  Created by Amritpal Gill on 2024-09-24.
 //
 
+
 import SwiftUI
-import FirebaseAuth
 
 struct SignUpView: View {
-    @State private var email: String = ""
-    @State private var password: String = ""
-    @State private var confirmPassword: String = ""
-    @State private var dateOfBirth = Date()
-    @State private var isPasswordVisible: Bool = false
-    @State private var showAlert: Bool = false
-    @State private var alertMessage: String = ""
+    @ObservedObject var userViewModel = UserViewModel()
+    @State private var isSignedUp = false
+    @State private var navigateToLoginView: Bool = false
     @State private var navigateToContentView: Bool = false
-    
+
     var body: some View {
         NavigationView {
-            VStack {
-               
+            ZStack {
+                // Background Color
+                Color(.systemGray6).edgesIgnoringSafeArea(.all)
                 
-                Text("Create Your Account")
-                    .font(.subheadline)
-                    .foregroundColor(.black)
-                    .bold()
-                    .padding(.bottom, 20)
-                
-                VStack(spacing: 15) {
-                    TextField("Email Address", text: $email)
-                        .padding()
-                        .background(Color.gray.opacity(0.2))
-                        .cornerRadius(10)
+                VStack(spacing: 20) {
+                    // App Title
+                    Text("Create Account")
+                        .font(.largeTitle)
+                        .fontWeight(.bold)
+                        .foregroundColor(.blue)
+                        .padding(.top, 40)
                     
-                    HStack {
-                        if isPasswordVisible {
-                            TextField("Password", text: $password)
-                                .padding()
-                        } else {
-                            SecureField("Password", text: $password)
-                                .padding()
-                        }
-                        Button(action: {
-                            isPasswordVisible.toggle()
-                        }) {
-                            Image(systemName: isPasswordVisible ? "eye.slash.fill" : "eye.fill")
-                                .foregroundColor(.gray)
-                                .padding(10)
-                        }
+                    // Input Fields
+                    VStack(spacing: 16) {
+                        TextField("Username", text: $userViewModel.username)
+                            .textFieldStyle(RoundedBorderTextFieldStyle())
+                            .padding(.horizontal)
+                            .background(Color.white)
+                            .cornerRadius(10)
+                            .shadow(radius: 5)
+                        
+                        TextField("Phone Number", text: $userViewModel.phoneNumber)
+                            .keyboardType(.phonePad)
+                            .textFieldStyle(RoundedBorderTextFieldStyle())
+                            .padding(.horizontal)
+                            .background(Color.white)
+                            .cornerRadius(10)
+                            .shadow(radius: 5)
+                        
+                        TextField("Email", text: $userViewModel.email)
+                            .keyboardType(.emailAddress)
+                            .textFieldStyle(RoundedBorderTextFieldStyle())
+                            .padding(.horizontal)
+                            .background(Color.white)
+                            .cornerRadius(10)
+                            .shadow(radius: 5)
+                        
+                        SecureField("Password", text: $userViewModel.password)
+                            .textFieldStyle(RoundedBorderTextFieldStyle())
+                            .padding(.horizontal)
+                            .background(Color.white)
+                            .cornerRadius(10)
+                            .shadow(radius: 5)
+                        
+                        SecureField("Confirm Password", text: $userViewModel.confirmPassword)
+                            .textFieldStyle(RoundedBorderTextFieldStyle())
+                            .padding(.horizontal)
+                            .background(Color.white)
+                            .cornerRadius(10)
+                            .shadow(radius: 5)
                     }
-                    .background(Color.gray.opacity(0.2))
+
+                    // Gender Picker
+                    Picker("Gender", selection: $userViewModel.gender) {
+                        Text("Male").tag("Male")
+                        Text("Female").tag("Female")
+                    }
+                    .pickerStyle(SegmentedPickerStyle())
+                    .padding(.horizontal)
+                    .background(Color.white)
                     .cornerRadius(10)
+                    .shadow(radius: 5)
                     
-                    SecureField("Confirm Password", text: $confirmPassword)
-                        .padding()
-                        .background(Color.gray.opacity(0.2))
-                        .cornerRadius(10)
-                    
-                    DatePicker("Date of Birth", selection: $dateOfBirth, displayedComponents: .date)
-                        .datePickerStyle(WheelDatePickerStyle())
-                        .padding()
-                        .background(Color.gray.opacity(0.2))
-                        .cornerRadius(10)
-                }
-                .padding(.horizontal, 30)
-                
-                Spacer()
-                
-                Button(action: {
-                    signUpUser()
-                }) {
-                    Text("Sign Up")
-                        .foregroundColor(.white)
-                        .padding()
-                        .frame(maxWidth: .infinity)
-                        .background(Color.cyan)
-                        .cornerRadius(10)
-                        .padding(.horizontal, 30)
-                }
-                .padding(.vertical, 20)
-                
-                HStack {
-                    Text("Already have an account?")
-                        .foregroundColor(.black)
-                    
-                    NavigationLink(destination: LoginView()) {
-                        Text("Sign in here")
-                            .foregroundColor(.black)
-                            
+                    // Sign Up Button
+                    Button(action: {
+                        userViewModel.signUp()
+                        if userViewModel.isSignedUp {
+                            navigateToContentView = true
+                        }
+                    }) {
+                        Text("Sign Up")
+                            .font(.headline)
+                            .foregroundColor(.white)
+                            .frame(width: 280, height: 50)
+                            .background(Color.blue)
+                            .cornerRadius(10)
+                            .shadow(radius: 5)
                     }
+                    .padding(.top, 20)
+
+                    // Error Message
+                    if let errorMessage = userViewModel.errorMessage {
+                        Text(errorMessage)
+                            .foregroundColor(.red)
+                            .padding(.top, 10)
+                    }
+
+                    // Navigate to Login Button
+                    Button(action: {
+                        navigateToLoginView = true
+                    }) {
+                        Text("Already have an account? Log In")
+                            .foregroundColor(.blue)
+                            .underline()
+                    }
+                    .padding(.top, 30)
+                    
+                    Spacer()
                 }
-                .padding(.bottom, 200)
+                .padding(.horizontal, 20)
             }
-            .background(Color.white)
-            .alert(isPresented: $showAlert) {
-                Alert(
-                    title: Text("Sign Up Error"),
-                    message: Text(alertMessage),
-                    dismissButton: .default(Text("OK"))
-                )
-            }
-            .fullScreenCover(isPresented: $navigateToContentView, content: {
+            .fullScreenCover(isPresented: $navigateToContentView) {
                 ContentView()
-                    .onDisappear() {
+                    .onDisappear {
                         navigateToContentView = false
                     }
-            })
-        }
-    }
-    
-    private func signUpUser() {
-        if email.isEmpty || password.isEmpty || confirmPassword.isEmpty {
-            showAlert(message: "Please fill in all fields.")
-            return
-        }
-        
-        if password != confirmPassword {
-            showAlert(message: "Passwords do not match.")
-            return
-        }
-        
-        if !Utils.isValidEmail(email) {
-            showAlert(message: "Please enter a valid Email Address.")
-            return
-        }
-        
-        if !Utils.isPasswordValid(password) {
-            showAlert(message: "Password must contain at least one letter and one digit.")
-            return
-        }
-        
-        let age = Utils.calculateAge(from: dateOfBirth)
-        if age < 18 {
-            showAlert(message: "You must be at least 18 years old to sign up.")
-            return
-        }
-        
-        Auth.auth().createUser(withEmail: email, password: password) { authResult, error in
-            if let error = error {
-                self.showAlert(message: error.localizedDescription)
-            } else if let authResult = authResult {
-                let userID = authResult.user.uid
-                
-                print("User ID: \(userID), Age: \(age)")
-                SessionManager.shared.loginUser(userid: userID) { success in
-                    if success {
-                        self.navigateToContentView = true
-                    } else {
-                        self.showAlert(message: "Failed to sign up. Please try again later.")
+            }
+            .fullScreenCover(isPresented: $navigateToLoginView) {
+                LoginView()
+                    .onDisappear {
+                        navigateToLoginView = false
                     }
-                }
-            } else {
-                self.showAlert(message: "Sign up failed. Please try again later.")
             }
         }
-    }
-    
-    private func showAlert(message: String) {
-        alertMessage = message
-        showAlert = true
     }
 }
 
