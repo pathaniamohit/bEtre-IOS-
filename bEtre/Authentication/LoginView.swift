@@ -21,8 +21,14 @@ struct LoginView: View {
                 
                 VStack(spacing: 20) {
                     // App Title
-                    Text("Welcome Back!")
+                    Text("bEtre")
                         .font(.largeTitle)
+                        .fontWeight(.bold)
+                        .foregroundColor(.blue)
+                        .padding(.top, 60)
+                    
+                    Text("Sign In")
+                        .font(.title)
                         .fontWeight(.bold)
                         .foregroundColor(.blue)
                         .padding(.top, 40)

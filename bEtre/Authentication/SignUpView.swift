@@ -22,8 +22,14 @@ struct SignUpView: View {
                 
                 VStack(spacing: 20) {
                     // App Title
-                    Text("Create Account")
+                    Text("bEtre")
                         .font(.largeTitle)
+                        .fontWeight(.bold)
+                        .foregroundColor(.blue)
+                        .padding(.top, 40)
+                    
+                    Text("Sign Up")
+                        .font(.title3)
                         .fontWeight(.bold)
                         .foregroundColor(.blue)
                         .padding(.top, 40)
