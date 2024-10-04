@@ -25,6 +25,8 @@
 		1815FE5E2CA792BF009000F9 /* CreateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1815FE5D2CA792BF009000F9 /* CreateView.swift */; };
 		1815FE602CA792D9009000F9 /* InboxView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1815FE5F2CA792D9009000F9 /* InboxView.swift */; };
 		1815FE622CA792EA009000F9 /* ProfileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1815FE612CA792EA009000F9 /* ProfileView.swift */; };
+		1815FE642CAF6E9D009000F9 /* SplashScreenView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1815FE632CAF6E9D009000F9 /* SplashScreenView.swift */; };
+		1815FE662CAF7A03009000F9 /* EditProfileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1815FE652CAF7A03009000F9 /* EditProfileView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -45,6 +47,8 @@
 		1815FE5D2CA792BF009000F9 /* CreateView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CreateView.swift; sourceTree = "<group>"; };
 		1815FE5F2CA792D9009000F9 /* InboxView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InboxView.swift; sourceTree = "<group>"; };
 		1815FE612CA792EA009000F9 /* ProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileView.swift; sourceTree = "<group>"; };
+		1815FE632CAF6E9D009000F9 /* SplashScreenView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplashScreenView.swift; sourceTree = "<group>"; };
+		1815FE652CAF7A03009000F9 /* EditProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditProfileView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -112,6 +116,8 @@
 				1815FE512CA32F37009000F9 /* LoginView.swift */,
 				1815FE532CA7575B009000F9 /* ForgotPasswordView.swift */,
 				1815FE552CA75C71009000F9 /* UserViewModel.swift */,
+				1815FE632CAF6E9D009000F9 /* SplashScreenView.swift */,
+				1815FE652CAF7A03009000F9 /* EditProfileView.swift */,
 			);
 			path = Authentication;
 			sourceTree = "<group>";
@@ -201,6 +207,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				1815FE662CAF7A03009000F9 /* EditProfileView.swift in Sources */,
 				1815FE5E2CA792BF009000F9 /* CreateView.swift in Sources */,
 				1815FE622CA792EA009000F9 /* ProfileView.swift in Sources */,
 				1815FE602CA792D9009000F9 /* InboxView.swift in Sources */,
@@ -208,6 +215,7 @@
 				1815FE522CA32F37009000F9 /* LoginView.swift in Sources */,
 				1815FE562CA75C71009000F9 /* UserViewModel.swift in Sources */,
 				1815FE542CA7575B009000F9 /* ForgotPasswordView.swift in Sources */,
+				1815FE642CAF6E9D009000F9 /* SplashScreenView.swift in Sources */,
 				1815FE5A2CA79213009000F9 /* ExlporeView.swift in Sources */,
 				1815FE392CA31AB6009000F9 /* ContentView.swift in Sources */,
 				1815FE462CA31AFB009000F9 /* SignUpView.swift in Sources */,
