@@ -8,11 +8,50 @@
 import SwiftUI
 
 struct SplashScreenView: View {
+    @State private var isActive: Bool = false
+    
     var body: some View {
-        Text(/*@START_MENU_TOKEN@*/"Hello, World!"/*@END_MENU_TOKEN@*/)
+        if isActive {
+            
+            LoginView()
+        } else {
+            
+            ZStack {
+                
+                Image("Splash_logo")
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+                    .frame(width: UIScreen.main.bounds.width, height: UIScreen.main.bounds.height)
+                    .clipped()
+                
+                
+                VStack {
+                    Text("bEtre")
+                        .font(.largeTitle)
+                        .fontWeight(.bold)
+                        .foregroundColor(.mint)
+                        .shadow(radius: 5)
+                        .padding(.top, -300)
+                }
+                .onAppear {
+                    
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                        withAnimation {
+                            self.isActive = true
+                        }
+                    }
+                }
+                
+            }
+            .edgesIgnoringSafeArea(.all)
+        }
     }
 }
+    
+    
+struct SplashScreenView_Previews: PreviewProvider {
+        static var previews: some View {
+            SplashScreenView()
+        }
+    }
 
-#Preview {
-    SplashScreenView()
-}
