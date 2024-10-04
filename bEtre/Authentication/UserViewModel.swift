@@ -100,4 +100,27 @@ class UserViewModel: ObservableObject {
             }
         }
     }
+    
+    func saveProfile() {
+        guard let userId = Auth.auth().currentUser?.uid else {
+            self.errorMessage = "User not logged in"
+            return
+        }
+        
+        let db = Firestore.firestore()
+        
+        // Update the user's information in Firestore
+        db.collection("users").document(userId).updateData([
+            "username": username,
+            "phoneNumber": phoneNumber,
+            "gender": gender
+        ]) { error in
+            if let error = error {
+                print("Error updating user info: \(error.localizedDescription)")
+                self.errorMessage = "Failed to update profile"
+            } else {
+                print("User info updated successfully")
+            }
+        }
+    }
 }
