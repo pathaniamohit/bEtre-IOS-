@@ -17,7 +17,7 @@ struct bEtreApp: App {
     var body: some Scene {
         
         WindowGroup {
-            ContentView()
+            SplashScreenView()
             
         }
         

@@ -51,7 +51,7 @@ struct InboxView: View {
                 }
                 .padding(.vertical, 8)
             }
-            .navigationTitle("Inbox")
+            .navigationTitle("Notification")
         }
     }
 }
