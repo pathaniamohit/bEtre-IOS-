@@ -7,9 +7,14 @@
 
 import SwiftUI
 
+import SwiftUI
+import Firebase
+import FirebaseAuth
+
 struct SettingsView: View {
     @ObservedObject var userViewModel: UserViewModel
     @Environment(\.dismiss) var dismiss
+    @State private var showLogoutAlert = false
 
     var body: some View {
         NavigationView {
@@ -17,19 +22,9 @@ struct SettingsView: View {
                 NavigationLink(destination: EditProfileView(userViewModel: userViewModel)) {
                     Text("Edit Profile")
                 }
-                NavigationLink(destination: AccountPrivacyView()) {
-                    Text("Account & Privacy")
-                }
-                NavigationLink(destination: AboutView()) {
-                    Text("About")
-                }
+                
                 Button(action: {
-                    do {
-                        try Auth.auth().signOut()
-                        dismiss()
-                    } catch {
-                        print("Logout failed: \(error.localizedDescription)")
-                    }
+                    showLogoutAlert = true
                 }) {
                     Text("Logout")
                         .foregroundColor(.red)
@@ -37,11 +32,29 @@ struct SettingsView: View {
             }
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.inline)
+            .alert(isPresented: $showLogoutAlert) {
+                Alert(
+                    title: Text("Confirm Logout"),
+                    message: Text("Are you sure you want to log out?"),
+                    primaryButton: .destructive(Text("Yes")) {
+                        logoutUser()
+                    },
+                    secondaryButton: .cancel()
+                )
+            }
+        }
+    }
+
+    private func logoutUser() {
+        do {
+            try Auth.auth().signOut()
+            dismiss() 
+        } catch {
+            print("Logout failed: \(error.localizedDescription)")
         }
     }
 }
 
-
 #Preview {
-    SettingsView()
+    SettingsView(userViewModel: <#UserViewModel#>)
 }
