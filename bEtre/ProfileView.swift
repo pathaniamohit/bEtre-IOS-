@@ -1,375 +1,41 @@
-//////
-//////  ProfileView.swift
-//////  bEtre
-//////
-//////  Created by Amritpal Gill on 2024-09-27.
-//////
-////
-//////import SwiftUI
-//////
-//////struct ProfileView: View {
-//////    // Sample data
-//////    let username = "username123"
-//////    let profileImage = Image(systemName: "person.circle.fill") // Replace with your actual profile image
-//////    let posts = Array(repeating: "post", count: 12) // Sample posts array
-//////    let followers = 1000
-//////    let following = 500
-//////    
-//////    let gridColumns = [
-//////        GridItem(.flexible()),
-//////        GridItem(.flexible()),
-//////        GridItem(.flexible())
-//////    ]
-//////    
-//////    var body: some View {
-//////        ScrollView {
-//////            VStack {
-//////                // Profile Info
-//////                HStack {
-//////                    // Profile image
-//////                    profileImage
-//////                        .resizable()
-//////                        .frame(width: 100, height: 100)
-//////                        .clipShape(Circle())
-//////                    
-//////                    Spacer()
-//////                    
-//////                    // Stats
-//////                    HStack(spacing: 20) {
-//////                        VStack {
-//////                            Text("\(posts.count)")
-//////                                .font(.headline)
-//////                            Text("Posts")
-//////                                .font(.subheadline)
-//////                        }
-//////                        VStack {
-//////                            Text("\(followers)")
-//////                                .font(.headline)
-//////                            Text("Followers")
-//////                                .font(.subheadline)
-//////                        }
-//////                        VStack {
-//////                            Text("\(following)")
-//////                                .font(.headline)
-//////                            Text("Following")
-//////                                .font(.subheadline)
-//////                        }
-//////                    }
-//////                    Spacer()
-//////                }
-//////                .padding()
-//////                
-//////                // Username and Bio
-//////                VStack(alignment: .leading) {
-//////                    Text(username)
-//////                        .font(.title2)
-//////                        .bold()
-//////                    Text("This is a bio description.")
-//////                        .font(.subheadline)
-//////                        .padding(.top, 1)
-//////                }
-//////                .frame(maxWidth: .infinity, alignment: .leading)
-//////                .padding([.leading, .trailing])
-//////                
-//////                // Edit Profile Button
-//////                Button(action: {
-//////                    // Action for editing profile
-//////                }) {
-//////                    Text("Edit Profile")
-//////                        .frame(maxWidth: .infinity)
-//////                        .padding()
-//////                        .background(Color.gray.opacity(0.2))
-//////                        .cornerRadius(10)
-//////                }
-//////                .padding([.leading, .trailing])
-//////                
-//////                // Grid of Posts
-//////                LazyVGrid(columns: gridColumns, spacing: 2) {
-//////                    ForEach(posts.indices, id: \.self) { index in
-//////                        Rectangle()
-//////                            .foregroundColor(.gray)
-//////                            .aspectRatio(1, contentMode: .fill)
-//////                            .overlay(Text("Post \(index + 1)"))
-//////                    }
-//////                }
-//////            }
-//////        }
-//////    }
-//////}
-//////
-//////#Preview {
-//////    ProfileView()
-//////}
-////import SwiftUI
-////
-////struct ProfileView: View {
-////    // Sample data
-////    let username = "username123"
-////    let profileImage = Image(systemName: "person.circle.fill") // Replace with your actual profile image
-////    let posts = Array(repeating: "post", count: 12) // Sample posts array
-////    let followers = 1000
-////    let following = 500
-////    
-////    let gridColumns = [
-////        GridItem(.flexible()),
-////        GridItem(.flexible()),
-////        GridItem(.flexible())
-////    ]
-////    
-////    var body: some View {
-////        NavigationView { // Wrap the content in a NavigationView
-////            ScrollView {
-////                VStack {
-////                    // Profile Info
-////                    HStack {
-////                        // Profile image
-////                        profileImage
-////                            .resizable()
-////                            .frame(width: 100, height: 100)
-////                            .clipShape(Circle())
-////                        
-////                        Spacer()
-////                        
-////                        // Stats
-////                        HStack(spacing: 20) {
-////                            VStack {
-////                                Text("\(posts.count)")
-////                                    .font(.headline)
-////                                Text("Posts")
-////                                    .font(.subheadline)
-////                            }
-////                            VStack {
-////                                Text("\(followers)")
-////                                    .font(.headline)
-////                                Text("Followers")
-////                                    .font(.subheadline)
-////                            }
-////                            VStack {
-////                                Text("\(following)")
-////                                    .font(.headline)
-////                                Text("Following")
-////                                    .font(.subheadline)
-////                            }
-////                        }
-////                        Spacer()
-////                    }
-////                    .padding()
-////                    
-////                    // Username and Bio
-////                    VStack(alignment: .leading) {
-////                        Text(username)
-////                            .font(.title2)
-////                            .bold()
-////                        Text("This is a bio description.")
-////                            .font(.subheadline)
-////                            .padding(.top, 1)
-////                    }
-////                    .frame(maxWidth: .infinity, alignment: .leading)
-////                    .padding([.leading, .trailing])
-////                    
-////                    // Edit Profile Button
-//////                    Button(action: {
-//////                        // Action for editing profile
-//////                    }) {
-//////                        Text("Edit Profile")
-//////                            .frame(maxWidth: .infinity)
-//////                            .padding()
-//////                            .background(Color.gray.opacity(0.2))
-//////                            .cornerRadius(10)
-//////                    }
-//////                    .padding([.leading, .trailing])
-////                    
-////                    // Grid of Posts
-////                    LazyVGrid(columns: gridColumns, spacing: 2) {
-////                        ForEach(posts.indices, id: \.self) { index in
-////                            Rectangle()
-////                                .foregroundColor(.gray)
-////                                .aspectRatio(1, contentMode: .fill)
-////                                .overlay(Text("Post \(index + 1)"))
-////                        }
-////                    }
-////                }
-////                .navigationTitle("Profile")
-////                .navigationBarItems(trailing: settingsButton) // Add settings button to the navigation bar
-////            }
-////        }
-////    }
-////    
-////    // Settings button with options
-////    private var settingsButton: some View {
-////        Menu {
-////            Button(action: {
-////                // Action for editing profile
-////            }) {
-////                Text("Edit Profile")
-////            }
-////            
-////            Button(action: {
-////                // Action for account and privacy
-////            }) {
-////                Text("Account and Privacy")
-////            }
-////            
-////            
-////            Button(action: {
-////                // Action for about
-////            }) {
-////                Text("About")
-////            }
-////            
-////            Button(action: {
-////                // Action for logout
-////            }) {
-////                Text("Logout")
-////                    .foregroundColor(.red) // Optional: Highlight logout in red
-////            }
-////        } label: {
-////            Image(systemName: "gear")
-////                .font(.title) // Adjust the size of the icon
-////                .foregroundColor(.primary) // Adjust color as needed
-////        }
-////    }
-////}
-////
-////#Preview {
-////    ProfileView()
-////}
-//import SwiftUI
-//
-//struct ProfileView: View {
-//    @StateObject var userViewModel = UserViewModel() // Initialize UserViewModel
-//    let profileImage = Image(systemName: "person.circle.fill") // Replace with your actual profile image
-//    let posts = Array(repeating: "post", count: 12) // Sample posts array
-//    let followers = 1000
-//    let following = 500
-//    
-//    let gridColumns = [
-//        GridItem(.flexible()),
-//        GridItem(.flexible()),
-//        GridItem(.flexible())
-//    ]
-//    
-//    var body: some View {
-//        NavigationView { // Wrap the content in a NavigationView
-//            ScrollView {
-//                VStack {
-//                    // Profile Info
-//                    HStack {
-//                        // Profile image
-//                        profileImage
-//                            .resizable()
-//                            .frame(width: 100, height: 100)
-//                            .clipShape(Circle())
-//                        
-//                        Spacer()
-//                        
-//                        // Stats
-//                        HStack(spacing: 20) {
-//                            VStack {
-//                                Text("\(posts.count)")
-//                                    .font(.headline)
-//                                Text("Posts")
-//                                    .font(.subheadline)
-//                            }
-//                            VStack {
-//                                Text("\(followers)")
-//                                    .font(.headline)
-//                                Text("Followers")
-//                                    .font(.subheadline)
-//                            }
-//                            VStack {
-//                                Text("\(following)")
-//                                    .font(.headline)
-//                                Text("Following")
-//                                    .font(.subheadline)
-//                            }
-//                        }
-//                        Spacer()
-//                    }
-//                    .padding()
-//                    
-//                    // Username and Bio
-//                    VStack(alignment: .leading) {
-//                        Text(userViewModel.username.isEmpty ? "username123" : userViewModel.username) // Dynamic username
-//                            .font(.title2)
-//                            .bold()
-//                        Text("This is a bio description.")
-//                            .font(.subheadline)
-//                            .padding(.top, 1)
-//                    }
-//                    .frame(maxWidth: .infinity, alignment: .leading)
-//                    .padding([.leading, .trailing])
-//                    
-//                    // Grid of Posts
-//                    LazyVGrid(columns: gridColumns, spacing: 2) {
-//                        ForEach(posts.indices, id: \.self) { index in
-//                            Rectangle()
-//                                .foregroundColor(.gray)
-//                                .aspectRatio(1, contentMode: .fill)
-//                                .overlay(Text("Post \(index + 1)"))
-//                        }
-//                    }
-//                }
-//                .navigationTitle("Profile")
-//                .navigationBarItems(trailing: settingsButton) // Add settings button to the navigation bar
-//            }
-//        }
-//    }
-//    
-//    // Settings button with options
-//    private var settingsButton: some View {
-//        Menu {
-//            Button(action: {
-//                // Action for editing profile - Navigate to EditProfileView
-//                let editProfileView = EditProfileView(userViewModel: userViewModel)
-//                if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-//                   let rootViewController = windowScene.windows.first?.rootViewController {
-//                    rootViewController.present(UIHostingController(rootView: editProfileView), animated: true)
-//                }
-//            }) {
-//                Text("Edit Profile")
-//            }
-//            
-//            Button(action: {
-//                // Action for account and privacy
-//            }) {
-//                Text("Account and Privacy")
-//            }
-//            
-//            Button(action: {
-//                // Action for about
-//            }) {
-//                Text("About")
-//            }
-//            
-//            Button(action: {
-//                
-//                
-//                // Action for logout
-//            }) {
-//                Text("Logout")
-//                    .foregroundColor(.red) // Optional: Highlight logout in red
-//            }
-//        } label: {
-//            Image(systemName: "gear")
-//                .font(.title) // Adjust the size of the icon
-//                .foregroundColor(.primary) // Adjust color as needed
-//        }
-//    }
-//}
-//
-//#Preview {
-//    ProfileView()
-//}
 import SwiftUI
+import Firebase
+import FirebaseAuth
+import FirebaseDatabase
+import Foundation
+
+struct Post: Identifiable {
+    var id: String
+    var content: String
+    var countComment: Int
+    var countLike: Int
+    var imageUrl: String
+    var isReported: Bool
+    var location: String
+    var userId: String
+    var timestamp: TimeInterval
+
+    init(id: String, data: [String: Any]) {
+        self.id = id
+        self.content = data["content"] as? String ?? ""
+        self.countComment = data["count_comment"] as? Int ?? 0
+        self.countLike = data["count_like"] as? Int ?? 0
+        self.imageUrl = data["imageUrl"] as? String ?? ""
+        self.isReported = data["is_reported"] as? Bool ?? false
+        self.location = data["location"] as? String ?? ""
+        self.userId = data["userId"] as? String ?? ""
+        self.timestamp = data["timestamp"] as? TimeInterval ?? 0
+    }
+}
 
 struct ProfileView: View {
-    @StateObject var userViewModel = UserViewModel() // Initialize UserViewModel
-    @State private var isLoggedOut = false // State variable for logout
-    let profileImage = Image(systemName: "person.circle.fill") // Replace with your actual profile image
-    let posts = Array(repeating: "post", count: 12) // Sample posts array
-    let followers = 1000
-    let following = 500
+    @StateObject var userViewModel = UserViewModel()
+    @State private var isLoggedOut = false
+    @State private var posts: [Post] = []
+    @State private var isLoading = true
+    @State private var isShowingSettings = false
+    
+    let profileImage = Image(systemName: "person.circle.fill")
     
     let gridColumns = [
         GridItem(.flexible()),
@@ -378,113 +44,130 @@ struct ProfileView: View {
     ]
     
     var body: some View {
-        NavigationView { // Wrap the content in a NavigationView
+        NavigationView {
             ScrollView {
-                VStack {
-                    // Profile Info
-                    HStack {
-                        // Profile image
-                        profileImage
-                            .resizable()
-                            .frame(width: 100, height: 100)
-                            .clipShape(Circle())
-                        
-                        Spacer()
-                        
-                        // Stats
-                        HStack(spacing: 20) {
-                            VStack {
-                                Text("\(posts.count)")
-                                    .font(.headline)
-                                Text("Posts")
-                                    .font(.subheadline)
+                if isLoading {
+                    ProgressView("Loading posts...")
+                } else {
+                    VStack {
+                        HStack {
+                            profileImage
+                                .resizable()
+                                .frame(width: 100, height: 100)
+                                .clipShape(Circle())
+                            
+                            Spacer()
+                            
+                            HStack(spacing: 20) {
+                                VStack {
+                                    Text("\(posts.count)")
+                                        .font(.headline)
+                                    Text("Posts")
+                                        .font(.subheadline)
+                                }
+                                VStack {
+                                    Text("\(userViewModel.followers)")
+                                        .font(.headline)
+                                    Text("Followers")
+                                        .font(.subheadline)
+                                }
+                                VStack {
+                                    Text("\(userViewModel.following)")
+                                        .font(.headline)
+                                    Text("Following")
+                                        .font(.subheadline)
+                                }
                             }
-                            VStack {
-                                Text("\(followers)")
-                                    .font(.headline)
-                                Text("Followers")
-                                    .font(.subheadline)
-                            }
-                            VStack {
-                                Text("\(following)")
-                                    .font(.headline)
-                                Text("Following")
-                                    .font(.subheadline)
+                            Spacer()
+                        }
+                        .padding()
+                        
+                        VStack(alignment: .leading) {
+                            Text(userViewModel.username.isEmpty ? "username123" : userViewModel.username) .font(.title2)
+                                .bold()
+                            Text(userViewModel.bio.isEmpty ? "This is a bio description." : userViewModel.bio)
+                                .font(.subheadline)
+                                .padding(.top, 1)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding([.leading, .trailing])
+                        
+                        LazyVGrid(columns: gridColumns, spacing: 2) {
+                            ForEach(posts) { post in
+                                PostView(post: post)
                             }
                         }
-                        Spacer()
                     }
-                    .padding()
-                    
-                    // Username and Bio
-                    VStack(alignment: .leading) {
-                        Text(userViewModel.username.isEmpty ? "username123" : userViewModel.username) // Dynamic username
-                            .font(.title2)
-                            .bold()
-                        Text("This is a bio description.")
-                            .font(.subheadline)
-                            .padding(.top, 1)
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding([.leading, .trailing])
-                    
-                    // Grid of Posts
-                    LazyVGrid(columns: gridColumns, spacing: 2) {
-                        ForEach(posts.indices, id: \.self) { index in
-                            Rectangle()
-                                .foregroundColor(.gray)
-                                .aspectRatio(1, contentMode: .fill)
-                                .overlay(Text("Post \(index + 1)"))
-                        }
-                    }
+                    .navigationTitle("Profile")
+                    .navigationBarItems(trailing: settingsButton)
                 }
-                .navigationTitle("Profile")
-                .navigationBarItems(trailing: settingsButton) // Add settings button to the navigation bar
             }
-            .fullScreenCover(isPresented: $isLoggedOut) { // Full screen cover for LoginView
+            .onAppear {
+                fetchPostsForLoggedInUser()
+            }
+            .fullScreenCover(isPresented: $isLoggedOut) {
                 LoginView()
             }
         }
     }
     
-    // Settings button with options
-    private var settingsButton: some View {
-        Menu {
-            Button(action: {
-                // Action for editing profile - Navigate to EditProfileView
-                let editProfileView = EditProfileView(userViewModel: userViewModel)
-                if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-                   let rootViewController = windowScene.windows.first?.rootViewController {
-                    rootViewController.present(UIHostingController(rootView: editProfileView), animated: true)
-                }
-            }) {
-                Text("Edit Profile")
-            }
-            
-            Button(action: {
-                // Action for account and privacy
-            }) {
-                Text("Account and Privacy")
-            }
-            
-            Button(action: {
-                // Action for about
-            }) {
-                Text("About")
-            }
-            
-            Button(action: {
-                // Action for logout
-                isLoggedOut = true // Set to true to navigate to LoginView
-            }) {
-                Text("Logout")
-                    .foregroundColor(.red) // Optional: Highlight logout in red
-            }
-        } label: {
-            Image(systemName: "gear")
-                .font(.title) // Adjust the size of the icon
-                .foregroundColor(.primary) // Adjust color as needed
+    private func fetchPostsForLoggedInUser() {
+        guard let userId = Auth.auth().currentUser?.uid else {
+            print("No user logged in.")
+            return
         }
+        
+        let ref = Database.database().reference().child("posts")
+        ref.queryOrdered(byChild: "userId").queryEqual(toValue: userId).observe(.value) { snapshot in
+            var fetchedPosts: [Post] = []
+            for child in snapshot.children {
+                if let snapshot = child as? DataSnapshot,
+                   let postData = snapshot.value as? [String: Any] {
+                    let post = Post(id: snapshot.key, data: postData) // Create Post model
+                    fetchedPosts.append(post)
+                }
+            }
+            self.posts = fetchedPosts
+            self.isLoading = false
+        }
+    }
+    
+    private var settingsButton: some View {
+            Button(action: {
+                isShowingSettings = true // Trigger to present SettingsView
+            }) {
+                Image(systemName: "gear")
+                    .font(.title)
+                    .foregroundColor(.primary)
+            }
+        }
+    }
+
+struct PostView: View {
+    let post: Post
+    
+    var body: some View {
+        VStack {
+            if let url = URL(string: post.imageUrl) {
+                AsyncImage(url: url) { image in
+                    image
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                } placeholder: {
+                    ProgressView()
+                }
+                .frame(width: 100, height: 100)
+                .clipped()
+            }
+            Text(post.content)
+                .font(.caption)
+            Text(post.location)
+                .font(.caption)
+                .foregroundColor(.gray)
+        }
+        .frame(width: 100, height: 130)
+        .background(Color.gray.opacity(0.2))
+        .cornerRadius(10)
     }
 }
 
