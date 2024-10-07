@@ -6,14 +6,13 @@
 //
 
 import SwiftUI
-import Firebase
 import FirebaseAuth
 import FirebaseStorage
 import FirebaseDatabase
 
 struct EditProfileView: View {
     @ObservedObject var userViewModel: UserViewModel
-    @Environment(\.dismiss) var dismiss
+    @Environment(\.dismiss) var dismiss 
     @State private var showingImagePicker = false
     @State private var inputImage: UIImage?
     @State private var isShowingPasswordChangePopup = false
@@ -26,15 +25,19 @@ struct EditProfileView: View {
         NavigationView {
             VStack(spacing: 20) {
                 Button(action: {
-                    showingImagePicker = true  image picker
+                    showingImagePicker = true
                 }) {
-                    if let profileImage = userViewModel.profileImage {
-                        Image(uiImage: profileImage)
-                            .resizable()
-                            .scaledToFill()
-                            .frame(width: 100, height: 100)
-                            .clipShape(Circle())
-                            .shadow(radius: 5)
+                    if !userViewModel.profileImageUrl.isEmpty, let url = URL(string: userViewModel.profileImageUrl) {
+                        AsyncImage(url: url) { image in
+                            image.resizable()
+                        } placeholder: {
+                            Image(systemName: "person.circle.fill")
+                                .resizable()
+                                .scaledToFill()
+                        }
+                        .frame(width: 100, height: 100)
+                        .clipShape(Circle())
+                        .shadow(radius: 5)
                     } else {
                         Image(systemName: "person.circle.fill")
                             .resizable()
@@ -93,7 +96,7 @@ struct EditProfileView: View {
 
                 Button(action: {
                     if phoneNumberError == nil {
-                        userViewModel.saveProfile() //
+                        userViewModel.saveProfile()
                         dismiss()
                     }
                 }) {
@@ -141,7 +144,6 @@ struct EditProfileView: View {
 
     func loadImage() {
         guard let inputImage = inputImage else { return }
-        userViewModel.profileImage = inputImage
 
         if let imageData = inputImage.jpegData(compressionQuality: 0.8) {
             let storageRef = Storage.storage().reference().child("profile_images/\(userViewModel.userId).jpg")
@@ -153,7 +155,7 @@ struct EditProfileView: View {
                 storageRef.downloadURL { url, error in
                     if let url = url {
                         userViewModel.profileImageUrl = url.absoluteString
-                        userViewModel.saveProfile()
+                        userViewModel.saveProfile() // Save the image URL in Realtime Database
                     }
                 }
             }
@@ -207,11 +209,44 @@ struct EditProfileView: View {
     }
 }
 
+
+
+
+struct ProfileImagePicker: UIViewControllerRepresentable {
+    @Binding var image: UIImage?
+
+    class Coordinator: NSObject, UINavigationControllerDelegate, UIImagePickerControllerDelegate {
+        var parent: ProfileImagePicker
+
+        init(parent: ProfileImagePicker) {
+            self.parent = parent
+        }
+
+        func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey: Any]) {
+            if let uiImage = info[.originalImage] as? UIImage {
+                parent.image = uiImage
+            }
+            picker.dismiss(animated: true)
+        }
+    }
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(parent: self)
+    }
+
+    func makeUIViewController(context: Context) -> UIImagePickerController {
+        let picker = UIImagePickerController()
+        picker.delegate = context.coordinator
+        return picker
+    }
+
+    func updateUIViewController(_ uiViewController: UIImagePickerController, context: Context) {
+    }
+}
+
 struct EditProfileView_Previews: PreviewProvider {
     static var previews: some View {
-        
         let userViewModel = UserViewModel()
-
         EditProfileView(userViewModel: userViewModel)
     }
 }
