@@ -19,7 +19,9 @@ class UserViewModel: ObservableObject {
     @Published var password = ""
     @Published var confirmPassword = ""
     @Published var gender = "Male"
-    
+    @Published var followers: Int = 0
+    @Published var following: Int = 0
+    @Published var bio: String = "" 
     @Published var loginEmail = ""
     @Published var loginPassword = ""
     
