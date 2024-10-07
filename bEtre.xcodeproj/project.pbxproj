@@ -27,6 +27,7 @@
 		1815FE622CA792EA009000F9 /* ProfileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1815FE612CA792EA009000F9 /* ProfileView.swift */; };
 		1815FE642CAF6E9D009000F9 /* SplashScreenView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1815FE632CAF6E9D009000F9 /* SplashScreenView.swift */; };
 		1815FE662CAF7A03009000F9 /* EditProfileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1815FE652CAF7A03009000F9 /* EditProfileView.swift */; };
+		5981C0872CB485B800FD00B1 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5981C0862CB485B800FD00B1 /* SettingsView.swift */; };
 		59E0CB132CB0AC0E00B64AA3 /* FirebaseAnalytics in Frameworks */ = {isa = PBXBuildFile; productRef = 59E0CB122CB0AC0E00B64AA3 /* FirebaseAnalytics */; };
 		59E0CB152CB0AC0E00B64AA3 /* FirebaseAnalyticsOnDeviceConversion in Frameworks */ = {isa = PBXBuildFile; productRef = 59E0CB142CB0AC0E00B64AA3 /* FirebaseAnalyticsOnDeviceConversion */; };
 		59E0CB172CB0AC0E00B64AA3 /* FirebaseAnalyticsWithoutAdIdSupport in Frameworks */ = {isa = PBXBuildFile; productRef = 59E0CB162CB0AC0E00B64AA3 /* FirebaseAnalyticsWithoutAdIdSupport */; };
@@ -72,6 +73,7 @@
 		1815FE612CA792EA009000F9 /* ProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileView.swift; sourceTree = "<group>"; };
 		1815FE632CAF6E9D009000F9 /* SplashScreenView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplashScreenView.swift; sourceTree = "<group>"; };
 		1815FE652CAF7A03009000F9 /* EditProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditProfileView.swift; sourceTree = "<group>"; };
+		5981C0862CB485B800FD00B1 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		59E0CB3F2CB45D9000B64AA3 /* ProfileImagePicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileImagePicker.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -137,6 +139,7 @@
 				1815FE3C2CA31AB9009000F9 /* Preview Content */,
 				1815FE592CA79213009000F9 /* ExlporeView.swift */,
 				1815FE5B2CA7929F009000F9 /* SearchView.swift */,
+				5981C0862CB485B800FD00B1 /* SettingsView.swift */,
 				1815FE5D2CA792BF009000F9 /* CreateView.swift */,
 				1815FE5F2CA792D9009000F9 /* InboxView.swift */,
 				1815FE612CA792EA009000F9 /* ProfileView.swift */,
@@ -282,6 +285,7 @@
 				1815FE622CA792EA009000F9 /* ProfileView.swift in Sources */,
 				1815FE602CA792D9009000F9 /* InboxView.swift in Sources */,
 				1815FE5C2CA7929F009000F9 /* SearchView.swift in Sources */,
+				5981C0872CB485B800FD00B1 /* SettingsView.swift in Sources */,
 				59E0CB402CB45D9000B64AA3 /* ProfileImagePicker.swift in Sources */,
 				1815FE522CA32F37009000F9 /* LoginView.swift in Sources */,
 				1815FE562CA75C71009000F9 /* UserViewModel.swift in Sources */,
