@@ -13,7 +13,7 @@ struct User: Identifiable {
     var isViral: Bool
 }
 
-struct Post: Identifiable {
+struct post: Identifiable {
     var id = UUID()
     var image: String // Replace with actual image
     var isViral: Bool
@@ -31,10 +31,10 @@ struct SearchView: View {
     ]
     
     let posts = [
-        Post(image: "post1", isViral: true), // Replace with actual image asset
-        Post(image: "post2", isViral: false),
-        Post(image: "post3", isViral: true),
-        Post(image: "post4", isViral: false)
+        post(image: "post1", isViral: true), // Replace with actual image asset
+        post(image: "post2", isViral: false),
+        post(image: "post3", isViral: true),
+        post(image: "post4", isViral: false)
     ]
     
     var body: some View {
