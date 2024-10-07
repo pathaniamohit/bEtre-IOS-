@@ -8,6 +8,9 @@
 import Foundation
 import FirebaseAuth
 import FirebaseFirestore
+import FirebaseStorage
+import FirebaseDatabase
+
 
 class UserViewModel: ObservableObject {
     @Published var username = ""
@@ -26,8 +29,9 @@ class UserViewModel: ObservableObject {
     @Published var isLoggedIn = false
     @Published var isPasswordReset = false
     @Published var errorMessage: String?
+    @Published var profileImageUrl = ""
+    @Published var userId: String = ""
     
-    // Firebase Signup
     func signUp() {
         guard !username.isEmpty, Utils.isValidEmail(email),
               Utils.isPasswordValid(password), password == confirmPassword else {
@@ -42,12 +46,12 @@ class UserViewModel: ObservableObject {
                 return
             }
             self?.isSignedUp = true
-            self?.saveAdditionalUserInfo() // Save username, phoneNumber, gender to Firestore if needed
+            self?.userId = result?.user.uid ?? ""
+            self?.saveAdditionalUserInfo()
             print("Sign-up successful")
         }
     }
     
-    // Firebase Login
     func login() {
         guard Utils.isValidEmail(loginEmail), !loginPassword.isEmpty else {
             self.errorMessage = "Invalid login details"
@@ -61,11 +65,12 @@ class UserViewModel: ObservableObject {
                 return
             }
             self?.isLoggedIn = true
+            self?.userId = result?.user.uid ?? "" 
+            self?.loadUserProfile()
             print("Login successful")
         }
     }
     
-    // Firebase Password Reset
     func resetPassword() {
         guard Utils.isValidEmail(forgotEmail) else {
             self.errorMessage = "Invalid email for password reset"
@@ -83,44 +88,55 @@ class UserViewModel: ObservableObject {
         }
     }
     
-    // Optional: Save additional info like username, phone number, gender to Firestore
     private func saveAdditionalUserInfo() {
-        guard let userId = Auth.auth().currentUser?.uid else { return }
-        let db = Firestore.firestore()
-        
-        db.collection("users").document(userId).setData([
-            "username": username,
-            "phoneNumber": phoneNumber,
-            "gender": gender
-        ]) { error in
-            if let error = error {
-                print("Error saving user info: \(error.localizedDescription)")
-            } else {
-                print("User info saved successfully")
-            }
-        }
-    }
-    
-    func saveProfile() {
-        guard let userId = Auth.auth().currentUser?.uid else {
-            self.errorMessage = "User not logged in"
-            return
-        }
-        
-        let db = Firestore.firestore()
-        
-        // Update the user's information in Firestore
-        db.collection("users").document(userId).updateData([
-            "username": username,
-            "phoneNumber": phoneNumber,
-            "gender": gender
-        ]) { error in
-            if let error = error {
-                print("Error updating user info: \(error.localizedDescription)")
-                self.errorMessage = "Failed to update profile"
-            } else {
-                print("User info updated successfully")
-            }
-        }
-    }
-}
+           guard let userId = Auth.auth().currentUser?.uid else { return }
+           let ref = Database.database().reference().child("users/\(userId)")
+           
+           ref.setValue([
+               "username": username,
+               "phoneNumber": phoneNumber,
+               "email": email,
+               "gender": gender,
+               "profileImageUrl": profileImageUrl
+           ]) { error, _ in
+               if let error = error {
+                   print("Error saving user info: \(error.localizedDescription)")
+               } else {
+                   print("User info saved successfully")
+               }
+           }
+       }
+
+       func loadUserProfile() {
+           guard let userId = Auth.auth().currentUser?.uid else { return }
+           let ref = Database.database().reference().child("users/\(userId)")
+
+           ref.observeSingleEvent(of: .value) { snapshot in
+               if let data = snapshot.value as? [String: Any] {
+                   self.username = data["username"] as? String ?? ""
+                   self.phoneNumber = data["phoneNumber"] as? String ?? ""
+                   self.email = data["email"] as? String ?? ""
+                   self.gender = data["gender"] as? String ?? ""
+                   self.profileImageUrl = data["profileImageUrl"] as? String ?? ""
+               }
+           }
+       }
+
+       func saveProfile() {
+           guard let userId = Auth.auth().currentUser?.uid else { return }
+           let ref = Database.database().reference().child("users/\(userId)")
+           
+           ref.updateChildValues([
+               "username": username,
+               "phoneNumber": phoneNumber,
+               "gender": gender,
+               "profileImageUrl": profileImageUrl
+           ]) { error, _ in
+               if let error = error {
+                   print("Error updating user info: \(error.localizedDescription)")
+               } else {
+                   print("User info updated successfully")
+               }
+           }
+       }
+   }
