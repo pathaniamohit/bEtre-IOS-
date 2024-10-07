@@ -12,10 +12,10 @@ import FirebaseDatabase
 
 struct EditProfileView: View {
     @ObservedObject var userViewModel: UserViewModel
-    @Environment(\.dismiss) var dismiss 
+    @Environment(\.dismiss) var dismiss
     @State private var showingImagePicker = false
     @State private var inputImage: UIImage?
-    @State private var isShowingPasswordChangePopup = false
+    @State private var showingPasswordChangeSheet = false
     @State private var oldPassword = ""
     @State private var newPassword = ""
     @State private var confirmPassword = ""
@@ -27,8 +27,8 @@ struct EditProfileView: View {
                 Button(action: {
                     showingImagePicker = true
                 }) {
-                    if !userViewModel.profileImageUrl.isEmpty, let url = URL(string: userViewModel.profileImageUrl) {
-                        AsyncImage(url: url) { image in
+                    if !userViewModel.profileImageUrl.isEmpty {
+                        AsyncImage(url: URL(string: userViewModel.profileImageUrl)) { image in
                             image.resizable()
                         } placeholder: {
                             Image(systemName: "person.circle.fill")
@@ -47,6 +47,7 @@ struct EditProfileView: View {
                             .shadow(radius: 5)
                     }
                 }
+
                 Text("Change Picture")
                     .font(.subheadline)
 
@@ -111,7 +112,7 @@ struct EditProfileView: View {
                 .padding(.top, 20)
 
                 Button(action: {
-                    isShowingPasswordChangePopup = true
+                    showingPasswordChangeSheet = true
                 }) {
                     Text("Change Password")
                         .font(.headline)
@@ -129,15 +130,11 @@ struct EditProfileView: View {
             .navigationTitle("Edit Profile")
             .navigationBarTitleDisplayMode(.inline)
             .sheet(isPresented: $showingImagePicker, onDismiss: loadImage) {
-                ImagePicker(image: $inputImage)
+                ProfileImagePicker(image: $inputImage)
             }
-            .alert(isPresented: $isShowingPasswordChangePopup) {
-                Alert(
-                    title: Text("Change Password"),
-                    message: passwordChangePopupContent(),
-                    primaryButton: .default(Text("Save"), action: changePassword),
-                    secondaryButton: .cancel()
-                )
+            .sheet(isPresented: $showingPasswordChangeSheet) {
+                passwordChangePopupContent()
+                    .padding()
             }
         }
     }
@@ -155,7 +152,7 @@ struct EditProfileView: View {
                 storageRef.downloadURL { url, error in
                     if let url = url {
                         userViewModel.profileImageUrl = url.absoluteString
-                        userViewModel.saveProfile() // Save the image URL in Realtime Database
+                        userViewModel.saveProfile()
                     }
                 }
             }
@@ -171,6 +168,27 @@ struct EditProfileView: View {
         return nil
     }
 
+    func passwordChangePopupContent() -> some View {
+        VStack(spacing: 16) {
+            SecureField("Old Password", text: $oldPassword)
+            SecureField("New Password", text: $newPassword)
+            SecureField("Confirm New Password", text: $confirmPassword)
+
+            Button(action: {
+                changePassword()
+            }) {
+                Text("Save Password")
+                    .font(.headline)
+                    .foregroundColor(.white)
+                    .frame(width: 280, height: 50)
+                    .background(Color.green)
+                    .cornerRadius(10)
+                    .shadow(radius: 5)
+            }
+        }
+        .padding()
+    }
+
     func changePassword() {
         guard newPassword == confirmPassword else {
             print("Passwords do not match")
@@ -181,7 +199,7 @@ struct EditProfileView: View {
             return
         }
 
-       
+        
         let user = Auth.auth().currentUser
         let credential = EmailAuthProvider.credential(withEmail: userViewModel.email, password: oldPassword)
         user?.reauthenticate(with: credential, completion: { result, error in
@@ -197,50 +215,6 @@ struct EditProfileView: View {
                 }
             })
         })
-    }
-
-    func passwordChangePopupContent() -> some View {
-        VStack(spacing: 16) {
-            SecureField("Old Password", text: $oldPassword)
-            SecureField("New Password", text: $newPassword)
-            SecureField("Confirm New Password", text: $confirmPassword)
-        }
-        .padding()
-    }
-}
-
-
-
-
-struct ProfileImagePicker: UIViewControllerRepresentable {
-    @Binding var image: UIImage?
-
-    class Coordinator: NSObject, UINavigationControllerDelegate, UIImagePickerControllerDelegate {
-        var parent: ProfileImagePicker
-
-        init(parent: ProfileImagePicker) {
-            self.parent = parent
-        }
-
-        func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey: Any]) {
-            if let uiImage = info[.originalImage] as? UIImage {
-                parent.image = uiImage
-            }
-            picker.dismiss(animated: true)
-        }
-    }
-
-    func makeCoordinator() -> Coordinator {
-        Coordinator(parent: self)
-    }
-
-    func makeUIViewController(context: Context) -> UIImagePickerController {
-        let picker = UIImagePickerController()
-        picker.delegate = context.coordinator
-        return picker
-    }
-
-    func updateUIViewController(_ uiViewController: UIImagePickerController, context: Context) {
     }
 }
 
