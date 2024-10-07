@@ -33,6 +33,7 @@ struct ProfileView: View {
     @State private var isLoggedOut = false
     @State private var posts: [Post] = []
     @State private var isLoading = true
+    @State private var isShowingSettings = false
     
     let profileImage = Image(systemName: "person.circle.fill")
     
@@ -132,44 +133,15 @@ struct ProfileView: View {
     }
     
     private var settingsButton: some View {
-        Menu {
             Button(action: {
-                let editProfileView = EditProfileView(userViewModel: userViewModel)
-                if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-                   let rootViewController = windowScene.windows.first?.rootViewController {
-                    rootViewController.present(UIHostingController(rootView: editProfileView), animated: true)
-                }
+                isShowingSettings = true // Trigger to present SettingsView
             }) {
-                Text("Edit Profile")
+                Image(systemName: "gear")
+                    .font(.title)
+                    .foregroundColor(.primary)
             }
-            
-            Button(action: {
-            }) {
-                Text("Account and Privacy")
-            }
-            
-            Button(action: {
-            }) {
-                Text("About")
-            }
-            
-            Button(action: {
-                do {
-                    try Auth.auth().signOut()
-                    isLoggedOut = true
-                } catch {
-                    print("Logout failed: \(error.localizedDescription)")
-                }
-            }) {
-                Text("Logout")
-                    .foregroundColor(.red)             }
-        } label: {
-            Image(systemName: "gear")
-                .font(.title)
-                .foregroundColor(.primary)
         }
     }
-}
 
 struct PostView: View {
     let post: Post
