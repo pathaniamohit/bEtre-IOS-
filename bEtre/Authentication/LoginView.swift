@@ -1,11 +1,17 @@
 import SwiftUI
+import FirebaseAuth
+import FirebaseDatabase
 
 struct LoginView: View {
     @ObservedObject var userViewModel = UserViewModel()
-    @State private var navigateToContentView: Bool = false
+    @State private var navigateToMaisonView: Bool = false
+    @State private var navigateToAdminView: Bool = false
     @State private var navigateToSignUpView: Bool = false
     @State private var isPasswordVisible: Bool = false
-    
+    @State private var errorMessage: String?
+    @State private var showAlert: Bool = false
+    private var databaseRef: DatabaseReference = Database.database().reference()
+
     var body: some View {
         NavigationView {
             ZStack {
@@ -39,7 +45,7 @@ struct LoginView: View {
                     .padding()
                     .background(Color.white)
                     .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.gray, lineWidth: 1))
-                    .frame(width: 340) 
+                    .frame(width: 340)
                     .padding(.top, 15)
 
                     HStack {
@@ -62,20 +68,16 @@ struct LoginView: View {
                     .padding()
                     .background(Color.white)
                     .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.gray, lineWidth: 1))
-                    .frame(width: 340) // Set width to 340
+                    .frame(width: 340)
                     .padding(.top, 10)
 
-                    // Sign In Button with fixed width of 340
                     Button(action: {
-                        userViewModel.login()
-                        if userViewModel.isLoggedIn {
-                            navigateToContentView = true
-                        }
+                        loginUser()
                     }) {
                         Text("Sign In")
                             .font(.headline)
                             .foregroundColor(.white)
-                            .frame(width: 340, height: 50) // Set width to 340
+                            .frame(width: 340, height: 50)
                             .background(Color.black)
                             .cornerRadius(10)
                             .fontWeight(.bold)
@@ -103,11 +105,20 @@ struct LoginView: View {
                     Spacer(minLength: 30)
                 }
                 .font(.custom("roboto_serif_regular", size: 16))
+                .alert(isPresented: $showAlert) {
+                    Alert(title: Text("Login Error"), message: Text(errorMessage ?? "Unknown error"), dismissButton: .default(Text("OK")))
+                }
             }
-            .fullScreenCover(isPresented: $navigateToContentView) {
-                ContentView()
+            .fullScreenCover(isPresented: $navigateToMaisonView) {
+                MaisonView()
                     .onDisappear {
-                        navigateToContentView = false
+                        navigateToMaisonView = false
+                    }
+            }
+            .fullScreenCover(isPresented: $navigateToAdminView) {
+                AdminView() // Implement AdminView to handle admin-specific logic
+                    .onDisappear {
+                        navigateToAdminView = false
                     }
             }
             .fullScreenCover(isPresented: $navigateToSignUpView) {
@@ -117,6 +128,70 @@ struct LoginView: View {
                     }
             }
         }
+    }
+    
+    private func loginUser() {
+        let email = userViewModel.loginEmail
+        let password = userViewModel.loginPassword
+        
+        if email.isEmpty || !isValidEmail(email) {
+            errorMessage = "Valid email is required"
+            showAlert = true
+            return
+        }
+        
+        if password.isEmpty {
+            errorMessage = "Password is required"
+            showAlert = true
+            return
+        }
+        
+        Auth.auth().signIn(withEmail: email, password: password) { authResult, error in
+            if let error = error {
+                handleLoginError(error: error)
+                return
+            }
+            
+            if let userId = Auth.auth().currentUser?.uid {
+                checkUserRole(userId: userId)
+            }
+        }
+    }
+
+    private func checkUserRole(userId: String) {
+        databaseRef.child("users").child(userId).observeSingleEvent(of: .value) { snapshot in
+            if snapshot.exists(), let userData = snapshot.value as? [String: Any], let role = userData["role"] as? String {
+                navigateBasedOnRole(role: role)
+            } else {
+                errorMessage = "User role not found or user doesn't exist"
+                showAlert = true
+            }
+        } withCancel: { error in
+            errorMessage = "Error checking user role: \(error.localizedDescription)"
+            showAlert = true
+        }
+    }
+    
+    private func navigateBasedOnRole(role: String) {
+        if role == "admin" {
+            navigateToAdminView = true
+        } else if role == "user" {
+            navigateToMaisonView = true
+        } else {
+            errorMessage = "Unknown role."
+            showAlert = true
+        }
+    }
+
+    private func handleLoginError(error: Error) {
+        errorMessage = "Authentication failed: \(error.localizedDescription)"
+        showAlert = true
+    }
+
+    private func isValidEmail(_ email: String) -> Bool {
+        let emailRegEx = "[A-Z0-9a-z._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,64}"
+        let emailPred = NSPredicate(format: "SELF MATCHES %@", emailRegEx)
+        return emailPred.evaluate(with: email)
     }
 }
 
