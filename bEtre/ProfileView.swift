@@ -58,8 +58,8 @@ struct ProfileView: View {
                     }
 
                 }
-                .padding(.top, 16)
-
+                .padding(.top, 8)
+                
                 ScrollView {
                     VStack(spacing: 20) {
                         profileHeader // Profile Image, Name, Email

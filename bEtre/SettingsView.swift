@@ -6,7 +6,7 @@ struct SettingsView: View {
     @ObservedObject var userViewModel: UserViewModel
     @Environment(\.dismiss) var dismiss
     @State private var showLogoutAlert = false
-
+    @State private var isLoggedOut = false 
     var body: some View {
         NavigationView {
             VStack {
@@ -54,6 +54,9 @@ struct SettingsView: View {
                     secondaryButton: .cancel()
                 )
             }
+            .fullScreenCover(isPresented: $isLoggedOut) {
+                LoginView()
+            }
         }
         .background(Color.clear)
     }
@@ -61,7 +64,7 @@ struct SettingsView: View {
     private func logoutUser() {
         do {
             try Auth.auth().signOut()
-            dismiss()
+            isLoggedOut = true
         } catch {
             print("Logout failed: \(error.localizedDescription)")
         }
