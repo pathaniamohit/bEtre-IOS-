@@ -1,74 +1,70 @@
-//
-//  ForgotPasswordView.swift
-//  bEtre
-//
-//  Created by Amritpal Gill on 2024-09-27.
-//
-
-
-
 import SwiftUI
 
 struct ForgotPasswordView: View {
     @ObservedObject var userViewModel = UserViewModel()
-    @State private var isPasswordReset = false
+    @State private var navigateToLoginView: Bool = false
     
     var body: some View {
-        ZStack {
-            // Background color
-            Color(.systemGray6).edgesIgnoringSafeArea(.all)
-            
-            VStack(spacing: 20) {
-                // Title
-                Text("Reset Password")
-                    .font(.largeTitle)
-                    .fontWeight(.bold)
-                    .foregroundColor(.blue)
-                    .padding(.top, 40)
+        NavigationStack {
+            ZStack {
+                Image("forgot_password_image")
+                    .resizable()
+                    .scaledToFill()
+                    .edgesIgnoringSafeArea(.all)
+                
+                VStack {
+                    Spacer()
 
-                // Email TextField
-                TextField("Enter your email", text: $userViewModel.forgotEmail)
-                    .keyboardType(.emailAddress)
-                    .textFieldStyle(RoundedBorderTextFieldStyle())
-                    .padding(.horizontal)
-                    .background(Color.white)
-                    .cornerRadius(10)
-                    .shadow(radius: 5)
+                    VStack {
+                        Text("bEtre")
+                            .font(.custom("amarante", size: 48))
+                            .fontWeight(.bold)
+                            .foregroundColor(.black)
+                            .padding(.top, -30)
 
-                // Reset Button
-                Button(action: {
-                    userViewModel.resetPassword()
-                    if userViewModel.isPasswordReset {
-                        isPasswordReset = true
+                        Text("Reset Account Password")
+                            .font(.custom("roboto_serif_regular", size: 24))
+                            .fontWeight(.bold)
+                            .foregroundColor(.black)
+                            .padding(.top, 5)
+
+                        HStack(spacing: 10) {
+                            Image(systemName: "envelope")
+                                .foregroundColor(.black)
+                            
+                            TextField("Enter your email", text: $userViewModel.forgotEmail)
+                                .keyboardType(.emailAddress)
+                                .autocapitalization(.none)
+                        }
+                        .padding()
+                        .background(Color.white)
+                        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.black, lineWidth: 1))
+                        .frame(width: 340)
+                        .padding(.top, 15)
+
+                        Button(action: {
+                            userViewModel.resetPassword()
+                        }) {
+                            Text("Reset Password")
+                                .font(.headline)
+                                .foregroundColor(.white)
+                                .frame(width: 340, height: 50)
+                                .background(Color.black)
+                                .cornerRadius(10)
+                                .fontWeight(.bold)
+                        }
+                        .padding(.top, 20)
                     }
-                }) {
-                    Text("Reset Password")
-                        .font(.headline)
-                        .foregroundColor(.white)
-                        .frame(width: 280, height: 50)
-                        .background(Color.blue)
-                        .cornerRadius(10)
-                        .shadow(radius: 5)
-                }
-                .padding(.top, 20)
+                    .multilineTextAlignment(.center)
 
-                // Display error message if any
-                if let errorMessage = userViewModel.errorMessage {
-                    Text(errorMessage)
-                        .foregroundColor(.red)
-                        .padding(.top, 10)
+                    Spacer()
                 }
-
-                // Success message after password reset
-                if userViewModel.isPasswordReset {
-                    Text("Password reset email sent!")
-                        .foregroundColor(.green)
-                        .padding(.top, 10)
-                }
-
-                Spacer()
+                .font(.custom("roboto_serif_regular", size: 16))
+                .padding(.top, -60)
             }
-            .padding(.horizontal, 20)
+            .navigationDestination(isPresented: $navigateToLoginView) {
+                LoginView()
+            }
         }
     }
 }
