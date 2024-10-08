@@ -29,88 +29,122 @@ struct Post: Identifiable {
 }
 
 struct ProfileView: View {
-    @StateObject var userViewModel = UserViewModel()
-    @State private var isLoggedOut = false
+    @StateObject var userViewModel = UserViewModel() // Assumed UserViewModel handles followers/following
     @State private var posts: [Post] = []
-    @State private var isLoading = true
-    @State private var isShowingSettings = false
-    
-    let profileImage = Image(systemName: "person.circle.fill")
+    @State private var isShowingSettings = false // State to control SettingsView presentation
     
     let gridColumns = [
-        GridItem(.flexible()),
         GridItem(.flexible()),
         GridItem(.flexible())
     ]
     
     var body: some View {
         NavigationView {
-            ScrollView {
-                if isLoading {
-                    ProgressView("Loading posts...")
-                } else {
-                    VStack {
-                        HStack {
-                            profileImage
-                                .resizable()
-                                .frame(width: 100, height: 100)
-                                .clipShape(Circle())
-                            
-                            Spacer()
-                            
-                            HStack(spacing: 20) {
-                                VStack {
-                                    Text("\(posts.count)")
-                                        .font(.headline)
-                                    Text("Posts")
-                                        .font(.subheadline)
-                                }
-                                VStack {
-                                    Text("\(userViewModel.followers)")
-                                        .font(.headline)
-                                    Text("Followers")
-                                        .font(.subheadline)
-                                }
-                                VStack {
-                                    Text("\(userViewModel.following)")
-                                        .font(.headline)
-                                    Text("Following")
-                                        .font(.subheadline)
-                                }
-                            }
-                            Spacer()
-                        }
-                        .padding()
+            VStack {
+                HStack {
+                    Spacer()
+                    Text("My Profile")
+                        .font(.custom("RobotoSerif-Regular", size: 24))
+                        .bold()
+                        .padding(.leading, 50)
+                    Spacer()
+                    Button(action: {
+                        isShowingSettings = true
+                    }) {
+                        Image(systemName: "gear")
+                            .font(.system(size: 30))
+                            .foregroundColor(.primary)
+                            .padding(.trailing, 16)
+                    }
+
+                }
+                .padding(.top, 8)
+                
+                ScrollView {
+                    VStack(spacing: 20) {
+                        profileHeader // Profile Image, Name, Email
+                        profileStats // Photos, Followers, Following counts
                         
-                        VStack(alignment: .leading) {
-                            Text(userViewModel.username.isEmpty ? "username123" : userViewModel.username) .font(.title2)
-                                .bold()
-                            Text(userViewModel.bio.isEmpty ? "This is a bio description." : userViewModel.bio)
-                                .font(.subheadline)
-                                .padding(.top, 1)
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding([.leading, .trailing])
-                        
-                        LazyVGrid(columns: gridColumns, spacing: 2) {
+                        LazyVGrid(columns: gridColumns, spacing: 10) { // 2-column grid for posts
                             ForEach(posts) { post in
                                 PostView(post: post)
                             }
                         }
+                        .padding(.horizontal)
                     }
-                    .navigationTitle("Profile")
-                    .navigationBarItems(trailing: settingsButton)
+                    .padding(.top, 20)
+                    .onAppear {
+                        fetchPostsForLoggedInUser()
+                    }
                 }
+                .navigationBarHidden(true) // Hide the default navigation bar
             }
-            .onAppear {
-                fetchPostsForLoggedInUser()
-            }
-            .fullScreenCover(isPresented: $isLoggedOut) {
-                LoginView()
+            .fullScreenCover(isPresented: $isShowingSettings) {
+                SettingsView(userViewModel: userViewModel)
             }
         }
     }
     
+    // Profile header for profile image, name, and email
+    private var profileHeader: some View {
+        VStack {
+            // Profile image
+            if !userViewModel.profileImageUrl.isEmpty, let url = URL(string: userViewModel.profileImageUrl) {
+                AsyncImage(url: url) { image in
+                    image
+                        .resizable()
+                        .frame(width: 100, height: 100)
+                        .clipShape(Circle())
+                        .overlay(Circle().stroke(Color.gray, lineWidth: 2))
+                } placeholder: {
+                    Image(systemName: "person.circle.fill")
+                        .resizable()
+                        .frame(width: 100, height: 100)
+                        .clipShape(Circle())
+                        .overlay(Circle().stroke(Color.gray, lineWidth: 2))
+                }
+            } else {
+                Image(systemName: "person.circle.fill")
+                    .resizable()
+                    .frame(width: 100, height: 100)
+                    .clipShape(Circle())
+                    .overlay(Circle().stroke(Color.gray, lineWidth: 2))
+            }
+            
+            // User name and email
+            Text(userViewModel.username.isEmpty ? "Kathrine Mils" : userViewModel.username)
+                .font(.custom("RobotoSerif-Regular", size: 18))
+                .bold()
+            
+            Text(userViewModel.email.isEmpty ? "kathrine@gmail.com" : userViewModel.email)
+                .font(.custom("RobotoSerif-Regular", size: 14))
+                .foregroundColor(.gray)
+        }
+        .padding(.bottom, 10)
+    }
+    
+    // Profile statistics (Photos, Followers, Follows)
+    private var profileStats: some View {
+        HStack(spacing: 50) { // Adjusted spacing between stats
+            statView(number: posts.count, label: "Photos")
+            statView(number: userViewModel.followers, label: "Followers")
+            statView(number: userViewModel.following, label: "Follows")
+        }
+        .padding(.horizontal)
+        .padding(.vertical, 10) // Add some padding around the stats section
+    }
+    
+    private func statView(number: Int, label: String) -> some View {
+        VStack {
+            Text("\(number)")
+                .font(.custom("RobotoSerif-Regular", size: 16))
+            Text(label)
+                .font(.custom("RobotoSerif-Regular", size: 12))
+                .foregroundColor(.gray)
+        }
+    }
+    
+    // Fetch posts of the logged-in user from Firebase
     private func fetchPostsForLoggedInUser() {
         guard let userId = Auth.auth().currentUser?.uid else {
             print("No user logged in.")
@@ -123,26 +157,16 @@ struct ProfileView: View {
             for child in snapshot.children {
                 if let snapshot = child as? DataSnapshot,
                    let postData = snapshot.value as? [String: Any] {
-                    let post = Post(id: snapshot.key, data: postData) // Create Post model
+                    let post = Post(id: snapshot.key, data: postData)
                     fetchedPosts.append(post)
                 }
             }
             self.posts = fetchedPosts
-            self.isLoading = false
         }
     }
-    
-    private var settingsButton: some View {
-            Button(action: {
-                isShowingSettings = true // Trigger to present SettingsView
-            }) {
-                Image(systemName: "gear")
-                    .font(.title)
-                    .foregroundColor(.primary)
-            }
-        }
-    }
+}
 
+// PostView for individual post grid cell
 struct PostView: View {
     let post: Post
     
@@ -154,18 +178,19 @@ struct PostView: View {
                         .resizable()
                         .aspectRatio(contentMode: .fill)
                 } placeholder: {
-                    ProgressView()
+                    Color.gray
                 }
-                .frame(width: 100, height: 100)
+                .frame(width: 150, height: 150) // Adjusted size for grid view
                 .clipped()
             }
             Text(post.content)
-                .font(.caption)
+                .font(.custom("RobotoSerif-Regular", size: 12))
+                .lineLimit(1)
             Text(post.location)
-                .font(.caption)
+                .font(.custom("RobotoSerif-Regular", size: 12))
                 .foregroundColor(.gray)
         }
-        .frame(width: 100, height: 130)
+        .frame(width: 150, height: 180)
         .background(Color.gray.opacity(0.2))
         .cornerRadius(10)
     }

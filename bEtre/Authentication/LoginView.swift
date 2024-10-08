@@ -1,105 +1,124 @@
-//
-//  LoginView.swift
-//  bEtre
-//
-//  Created by Amritpal Gill on 2024-09-24.
-//
-
-
 import SwiftUI
+import FirebaseAuth
+import FirebaseDatabase
 
 struct LoginView: View {
     @ObservedObject var userViewModel = UserViewModel()
-    @State private var navigateToContentView: Bool = false
+    @State private var navigateToMaisonView: Bool = false
+    @State private var navigateToAdminView: Bool = false
     @State private var navigateToSignUpView: Bool = false
-    
+    @State private var isPasswordVisible: Bool = false
+    @State private var errorMessage: String?
+    @State private var showAlert: Bool = false
+    private var databaseRef: DatabaseReference = Database.database().reference()
+
     var body: some View {
         NavigationView {
             ZStack {
-                // Background color
-                Color(.systemGray6).edgesIgnoringSafeArea(.all)
+                Image("login_image")
+                    .resizable()
+                    .scaledToFill()
+                    .edgesIgnoringSafeArea(.all)
                 
-                VStack(spacing: 20) {
-                    // App Title
+                VStack {
+                    Spacer(minLength: 50)
+                    
                     Text("bEtre")
-                        .font(.largeTitle)
+                        .font(.custom("amarante", size: 48))
                         .fontWeight(.bold)
-                        .foregroundColor(.blue)
-                        .padding(.top, 60)
-                    
+                        .foregroundColor(.black)
+                        .padding(.top, 20)
+
                     Text("Sign In")
-                        .font(.title)
+                        .font(.custom("roboto_serif_regular", size: 30))
                         .fontWeight(.bold)
-                        .foregroundColor(.blue)
-                        .padding(.top, 40)
+                        .foregroundColor(.black)
+                        .padding(.top, 5)
                     
-                    // Email TextField
-                    TextField("Email", text: $userViewModel.loginEmail)
-                        .keyboardType(.emailAddress)
-                        .textFieldStyle(RoundedBorderTextFieldStyle())
-                        .padding(.horizontal)
-                        .background(Color.white)
-                        .cornerRadius(10)
-                        .shadow(radius: 5)
-                    
-                    // Password TextField
-                    SecureField("Password", text: $userViewModel.loginPassword)
-                        .textFieldStyle(RoundedBorderTextFieldStyle())
-                        .padding(.horizontal)
-                        .background(Color.white)
-                        .cornerRadius(10)
-                        .shadow(radius: 5)
-                    
-                    // Login Button
-                    Button(action: {
-                        userViewModel.login()
-                        if userViewModel.isLoggedIn {
-                            navigateToContentView = true
+                    HStack {
+                        Image(systemName: "envelope")
+                            .foregroundColor(.black)
+                        TextField("Email", text: $userViewModel.loginEmail)
+                            .keyboardType(.emailAddress)
+                            .autocapitalization(.none)
+                    }
+                    .padding()
+                    .background(Color.white)
+                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.gray, lineWidth: 1))
+                    .frame(width: 340)
+                    .padding(.top, 15)
+
+                    HStack {
+                        Image(systemName: "lock")
+                            .foregroundColor(.black)
+                        
+                        if isPasswordVisible {
+                            TextField("Password", text: $userViewModel.loginPassword)
+                        } else {
+                            SecureField("Password", text: $userViewModel.loginPassword)
                         }
+                        
+                        Button(action: {
+                            isPasswordVisible.toggle()
+                        }) {
+                            Image(systemName: isPasswordVisible ? "eye" : "eye.slash")
+                                .foregroundColor(.gray)
+                        }
+                    }
+                    .padding()
+                    .background(Color.white)
+                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.gray, lineWidth: 1))
+                    .frame(width: 340)
+                    .padding(.top, 10)
+
+                    Button(action: {
+                        loginUser()
                     }) {
-                        Text("Login")
+                        Text("Sign In")
                             .font(.headline)
                             .foregroundColor(.white)
-                            .frame(width: 280, height: 50)
-                            .background(Color.blue)
+                            .frame(width: 340, height: 50)
+                            .background(Color.black)
                             .cornerRadius(10)
-                            .shadow(radius: 5)
+                            .fontWeight(.bold)
                     }
                     .padding(.top, 20)
 
-                    // Error Message
-                    if let errorMessage = userViewModel.errorMessage {
-                        Text(errorMessage)
-                            .foregroundColor(.red)
-                            .padding(.top, 10)
+                    NavigationLink(destination: ForgotPasswordView()) {
+                        Text("Forget Password?")
+                            .foregroundColor(.black)
+                            .fontWeight(.bold)
                     }
-                    
-                    // Navigate to Sign Up Button
+                    .padding(.top, 10)
+
+                    Spacer()
+
                     Button(action: {
                         navigateToSignUpView = true
                     }) {
                         Text("Don't have an account? Sign Up")
-                            .foregroundColor(.blue)
-                            .underline()
+                            .foregroundColor(.white)
+                            .fontWeight(.bold)
                     }
-                    .padding(.top, 20)
+                    .padding(.top, 120)
                     
-                    // Forgot Password Link
-                    NavigationLink(destination: ForgotPasswordView()) {
-                        Text("Forgot Password? Reset Here.")
-                            .foregroundColor(.blue)
-                            .underline()
-                    }
-                    .padding(.top, 10)
-                    
-                    Spacer()
+                    Spacer(minLength: 30)
                 }
-                .padding(.horizontal, 20)
+                .font(.custom("roboto_serif_regular", size: 16))
+                .alert(isPresented: $showAlert) {
+                    Alert(title: Text("Login Error"), message: Text(errorMessage ?? "Unknown error"), dismissButton: .default(Text("OK")))
+                }
             }
-            .fullScreenCover(isPresented: $navigateToContentView) {
-                ContentView()
+            .fullScreenCover(isPresented: $navigateToMaisonView) {
+                MaisonView()
                     .onDisappear {
-                        navigateToContentView = false
+                        navigateToMaisonView = false
+                    }
+            }
+            .fullScreenCover(isPresented: $navigateToAdminView) {
+                AdminView() // Implement AdminView to handle admin-specific logic
+                    .onDisappear {
+                        navigateToAdminView = false
                     }
             }
             .fullScreenCover(isPresented: $navigateToSignUpView) {
@@ -109,6 +128,70 @@ struct LoginView: View {
                     }
             }
         }
+    }
+    
+    private func loginUser() {
+        let email = userViewModel.loginEmail
+        let password = userViewModel.loginPassword
+        
+        if email.isEmpty || !isValidEmail(email) {
+            errorMessage = "Valid email is required"
+            showAlert = true
+            return
+        }
+        
+        if password.isEmpty {
+            errorMessage = "Password is required"
+            showAlert = true
+            return
+        }
+        
+        Auth.auth().signIn(withEmail: email, password: password) { authResult, error in
+            if let error = error {
+                handleLoginError(error: error)
+                return
+            }
+            
+            if let userId = Auth.auth().currentUser?.uid {
+                checkUserRole(userId: userId)
+            }
+        }
+    }
+
+    private func checkUserRole(userId: String) {
+        databaseRef.child("users").child(userId).observeSingleEvent(of: .value) { snapshot in
+            if snapshot.exists(), let userData = snapshot.value as? [String: Any], let role = userData["role"] as? String {
+                navigateBasedOnRole(role: role)
+            } else {
+                errorMessage = "User role not found or user doesn't exist"
+                showAlert = true
+            }
+        } withCancel: { error in
+            errorMessage = "Error checking user role: \(error.localizedDescription)"
+            showAlert = true
+        }
+    }
+    
+    private func navigateBasedOnRole(role: String) {
+        if role == "admin" {
+            navigateToAdminView = true
+        } else if role == "user" {
+            navigateToMaisonView = true
+        } else {
+            errorMessage = "Unknown role."
+            showAlert = true
+        }
+    }
+
+    private func handleLoginError(error: Error) {
+        errorMessage = "Authentication failed: \(error.localizedDescription)"
+        showAlert = true
+    }
+
+    private func isValidEmail(_ email: String) -> Bool {
+        let emailRegEx = "[A-Z0-9a-z._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,64}"
+        let emailPred = NSPredicate(format: "SELF MATCHES %@", emailRegEx)
+        return emailPred.evaluate(with: email)
     }
 }
 
