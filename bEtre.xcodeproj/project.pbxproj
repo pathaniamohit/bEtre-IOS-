@@ -73,6 +73,10 @@
 		1815FE612CA792EA009000F9 /* ProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileView.swift; sourceTree = "<group>"; };
 		1815FE632CAF6E9D009000F9 /* SplashScreenView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplashScreenView.swift; sourceTree = "<group>"; };
 		1815FE652CAF7A03009000F9 /* EditProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditProfileView.swift; sourceTree = "<group>"; };
+		5526514F2CB4B8ED00E6B56A /* roboto_serif_italic.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; name = roboto_serif_italic.ttf; path = ../../roboto_serif_italic.ttf; sourceTree = "<group>"; };
+		552651502CB4B8ED00E6B56A /* amarante.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; name = amarante.ttf; path = ../../amarante.ttf; sourceTree = "<group>"; };
+		552651512CB4B8ED00E6B56A /* roboto_serif_regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; name = roboto_serif_regular.ttf; path = ../../roboto_serif_regular.ttf; sourceTree = "<group>"; };
+		552651522CB4B97200E6B56A /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		5981C0862CB485B800FD00B1 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		59E0CB3F2CB45D9000B64AA3 /* ProfileImagePicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileImagePicker.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -132,17 +136,20 @@
 		1815FE352CA31AB6009000F9 /* bEtre */ = {
 			isa = PBXGroup;
 			children = (
+				552651522CB4B97200E6B56A /* Info.plist */,
+				552651502CB4B8ED00E6B56A /* amarante.ttf */,
+				5526514F2CB4B8ED00E6B56A /* roboto_serif_italic.ttf */,
+				552651512CB4B8ED00E6B56A /* roboto_serif_regular.ttf */,
+				5981C0862CB485B800FD00B1 /* SettingsView.swift */,
+				1815FE612CA792EA009000F9 /* ProfileView.swift */,
+				1815FE5F2CA792D9009000F9 /* InboxView.swift */,
+				1815FE5D2CA792BF009000F9 /* CreateView.swift */,
+				1815FE5B2CA7929F009000F9 /* SearchView.swift */,
 				1815FE442CA31ADA009000F9 /* Authentication */,
 				1815FE362CA31AB6009000F9 /* bEtreApp.swift */,
 				1815FE382CA31AB6009000F9 /* ContentView.swift */,
 				1815FE3A2CA31AB9009000F9 /* Assets.xcassets */,
 				1815FE3C2CA31AB9009000F9 /* Preview Content */,
-				1815FE592CA79213009000F9 /* ExlporeView.swift */,
-				1815FE5B2CA7929F009000F9 /* SearchView.swift */,
-				5981C0862CB485B800FD00B1 /* SettingsView.swift */,
-				1815FE5D2CA792BF009000F9 /* CreateView.swift */,
-				1815FE5F2CA792D9009000F9 /* InboxView.swift */,
-				1815FE612CA792EA009000F9 /* ProfileView.swift */,
 			);
 			path = bEtre;
 			sourceTree = "<group>";
@@ -158,6 +165,7 @@
 		1815FE442CA31ADA009000F9 /* Authentication */ = {
 			isa = PBXGroup;
 			children = (
+				1815FE592CA79213009000F9 /* ExlporeView.swift */,
 				1815FE472CA31EA4009000F9 /* GoogleService-Info.plist */,
 				1815FE452CA31AFB009000F9 /* SignUpView.swift */,
 				1815FE4D2CA32ECB009000F9 /* Utils.swift */,
@@ -432,9 +440,10 @@
 				DEVELOPMENT_ASSET_PATHS = "\"bEtre/Preview Content\"";
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = bEtre/Info.plist;
+				INFOPLIST_KEY_LSApplicationCategoryType = "";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
-				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -460,9 +469,10 @@
 				DEVELOPMENT_ASSET_PATHS = "\"bEtre/Preview Content\"";
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = bEtre/Info.plist;
+				INFOPLIST_KEY_LSApplicationCategoryType = "";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
-				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				LD_RUNPATH_SEARCH_PATHS = (

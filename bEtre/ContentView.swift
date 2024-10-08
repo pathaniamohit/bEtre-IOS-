@@ -1,10 +1,3 @@
-//
-//  ContentView.swift
-//  bEtre
-//
-//  Created by Amritpal Gill on 2024-09-24.
-//
-
 import SwiftUI
 
 struct ContentView: View {
@@ -55,9 +48,10 @@ struct ContentView: View {
             .navigationBarTitle("Your Profile", displayMode: .inline)
             .accentColor(.orange)
         }
-        .accentColor(.blue)  // Main accent color for the selected tab
+        .accentColor(.blue)
         .tabViewStyle(DefaultTabViewStyle())
         .background(Color(.systemGray6).edgesIgnoringSafeArea(.all)) // Light background color
+        .font(.custom("roboto_serif_regular", size: 16)) // Apply Roboto Serif font globally in ContentView
     }
 }
 

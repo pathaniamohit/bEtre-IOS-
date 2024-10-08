@@ -1,100 +1,110 @@
-//
-//  LoginView.swift
-//  bEtre
-//
-//  Created by Amritpal Gill on 2024-09-24.
-//
-
-
 import SwiftUI
 
 struct LoginView: View {
     @ObservedObject var userViewModel = UserViewModel()
     @State private var navigateToContentView: Bool = false
     @State private var navigateToSignUpView: Bool = false
+    @State private var isPasswordVisible: Bool = false
     
     var body: some View {
         NavigationView {
             ZStack {
-                // Background color
-                Color(.systemGray6).edgesIgnoringSafeArea(.all)
+                Image("login_image")
+                    .resizable()
+                    .scaledToFill()
+                    .edgesIgnoringSafeArea(.all)
                 
-                VStack(spacing: 20) {
-                    // App Title
+                VStack {
+                    Spacer(minLength: 50)
+                    
                     Text("bEtre")
-                        .font(.largeTitle)
+                        .font(.custom("amarante", size: 48))
                         .fontWeight(.bold)
-                        .foregroundColor(.blue)
-                        .padding(.top, 60)
-                    
+                        .foregroundColor(.black)
+                        .padding(.top, 20)
+
                     Text("Sign In")
-                        .font(.title)
+                        .font(.custom("roboto_serif_regular", size: 30))
                         .fontWeight(.bold)
-                        .foregroundColor(.blue)
-                        .padding(.top, 40)
+                        .foregroundColor(.black)
+                        .padding(.top, 5)
                     
-                    // Email TextField
-                    TextField("Email", text: $userViewModel.loginEmail)
-                        .keyboardType(.emailAddress)
-                        .textFieldStyle(RoundedBorderTextFieldStyle())
-                        .padding(.horizontal)
-                        .background(Color.white)
-                        .cornerRadius(10)
-                        .shadow(radius: 5)
-                    
-                    // Password TextField
-                    SecureField("Password", text: $userViewModel.loginPassword)
-                        .textFieldStyle(RoundedBorderTextFieldStyle())
-                        .padding(.horizontal)
-                        .background(Color.white)
-                        .cornerRadius(10)
-                        .shadow(radius: 5)
-                    
-                    // Login Button
+
+                    HStack {
+                        Image(systemName: "envelope")
+                            .foregroundColor(.black)
+                        TextField("Email", text: $userViewModel.loginEmail)
+                            .keyboardType(.emailAddress)
+                            .autocapitalization(.none)
+                    }
+                    .padding()
+                    .background(Color.white)
+                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.gray, lineWidth: 1))
+                    .padding(.horizontal, 25)
+                    .padding(.top, 15)
+
+                    HStack {
+                        Image(systemName: "lock")
+                            .foregroundColor(.black)
+                        
+                        if isPasswordVisible {
+                            TextField("Password", text: $userViewModel.loginPassword)
+                        } else {
+                            SecureField("Password", text: $userViewModel.loginPassword)
+                        }
+                        
+                        Button(action: {
+                            isPasswordVisible.toggle()
+                        }) {
+                            Image(systemName: isPasswordVisible ? "eye" : "eye.slash")
+                                .foregroundColor(.gray)
+                        }
+                    }
+                    .padding()
+                    .background(Color.white)
+                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.gray, lineWidth: 1))
+                    .padding(.horizontal, 25)
+                    .padding(.top, 10)
+
                     Button(action: {
                         userViewModel.login()
                         if userViewModel.isLoggedIn {
                             navigateToContentView = true
                         }
                     }) {
-                        Text("Login")
+                        Text("Sign In")
                             .font(.headline)
                             .foregroundColor(.white)
-                            .frame(width: 280, height: 50)
-                            .background(Color.blue)
+                            .frame(height: 50)
+                            .fontWeight(.bold)
+                            .frame(maxWidth: .infinity)
+                            .background(Color.black)
                             .cornerRadius(10)
-                            .shadow(radius: 5)
                     }
+                    .padding(.horizontal, 25)
                     .padding(.top, 20)
 
-                    // Error Message
-                    if let errorMessage = userViewModel.errorMessage {
-                        Text(errorMessage)
-                            .foregroundColor(.red)
-                            .padding(.top, 10)
+                    NavigationLink(destination: ForgotPasswordView()) {
+                        Text("Forget Password?")
+                            .foregroundColor(.black)
+                            .fontWeight(.bold)
                     }
-                    
-                    // Navigate to Sign Up Button
+                    .padding(.top, 10)
+
+                    Spacer()
+
                     Button(action: {
                         navigateToSignUpView = true
                     }) {
                         Text("Don't have an account? Sign Up")
-                            .foregroundColor(.blue)
-                            .underline()
+                            .foregroundColor(.white)
+                            .fontWeight(.bold)
                     }
-                    .padding(.top, 20)
+                    .padding(.top, 120)
                     
-                    // Forgot Password Link
-                    NavigationLink(destination: ForgotPasswordView()) {
-                        Text("Forgot Password? Reset Here.")
-                            .foregroundColor(.blue)
-                            .underline()
-                    }
-                    .padding(.top, 10)
-                    
-                    Spacer()
+                    Spacer(minLength: 30)
                 }
-                .padding(.horizontal, 20)
+                .font(.custom("roboto_serif_regular", size: 16))
             }
             .fullScreenCover(isPresented: $navigateToContentView) {
                 ContentView()

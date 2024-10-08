@@ -56,5 +56,7 @@ struct SettingsView: View {
 }
 
 #Preview {
-    SettingsView(userViewModel: <#UserViewModel#>)
+    let mockUserViewModel = UserViewModel() 
+    return SettingsView(userViewModel: mockUserViewModel)
 }
+
