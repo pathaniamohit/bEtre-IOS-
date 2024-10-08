@@ -29,7 +29,6 @@ struct LoginView: View {
                         .foregroundColor(.black)
                         .padding(.top, 5)
                     
-
                     HStack {
                         Image(systemName: "envelope")
                             .foregroundColor(.black)
@@ -40,7 +39,7 @@ struct LoginView: View {
                     .padding()
                     .background(Color.white)
                     .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.gray, lineWidth: 1))
-                    .padding(.horizontal, 25)
+                    .frame(width: 340) 
                     .padding(.top, 15)
 
                     HStack {
@@ -63,9 +62,10 @@ struct LoginView: View {
                     .padding()
                     .background(Color.white)
                     .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.gray, lineWidth: 1))
-                    .padding(.horizontal, 25)
+                    .frame(width: 340) // Set width to 340
                     .padding(.top, 10)
 
+                    // Sign In Button with fixed width of 340
                     Button(action: {
                         userViewModel.login()
                         if userViewModel.isLoggedIn {
@@ -75,13 +75,11 @@ struct LoginView: View {
                         Text("Sign In")
                             .font(.headline)
                             .foregroundColor(.white)
-                            .frame(height: 50)
-                            .fontWeight(.bold)
-                            .frame(maxWidth: .infinity)
+                            .frame(width: 340, height: 50) // Set width to 340
                             .background(Color.black)
                             .cornerRadius(10)
+                            .fontWeight(.bold)
                     }
-                    .padding(.horizontal, 25)
                     .padding(.top, 20)
 
                     NavigationLink(destination: ForgotPasswordView()) {
