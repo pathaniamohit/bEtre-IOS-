@@ -29,9 +29,11 @@ struct Post: Identifiable {
 }
 
 struct ProfileView: View {
-    @StateObject var userViewModel = UserViewModel() // Assumed UserViewModel handles followers/following
     @State private var posts: [Post] = []
-    @State private var isShowingSettings = false // State to control SettingsView presentation
+    @State private var isShowingSettings = false
+    @State private var profileImageUrl: String = ""
+    @State private var username: String = "Loading..."
+    @State private var bio: String = "Loading bio..."
     
     let gridColumns = [
         GridItem(.flexible()),
@@ -63,6 +65,11 @@ struct ProfileView: View {
                 ScrollView {
                     VStack(spacing: 20) {
                         profileHeader // Profile Image, Name, Email
+                        Text(bio)
+                            .font(.custom("RobotoSerif-Regular", size: 16))
+                            .padding()
+                            .foregroundColor(.gray)
+                        
                         profileStats // Photos, Followers, Following counts
                         
                         LazyVGrid(columns: gridColumns, spacing: 10) { // 2-column grid for posts
@@ -75,12 +82,14 @@ struct ProfileView: View {
                     .padding(.top, 20)
                     .onAppear {
                         fetchPostsForLoggedInUser()
+                        fetchUserProfile()
                     }
                 }
                 .navigationBarHidden(true) // Hide the default navigation bar
             }
             .fullScreenCover(isPresented: $isShowingSettings) {
-                SettingsView(userViewModel: userViewModel)
+                SettingsView()
+                
             }
         }
     }
@@ -88,8 +97,7 @@ struct ProfileView: View {
     // Profile header for profile image, name, and email
     private var profileHeader: some View {
         VStack {
-            // Profile image
-            if !userViewModel.profileImageUrl.isEmpty, let url = URL(string: userViewModel.profileImageUrl) {
+            if let url = URL(string: profileImageUrl) {
                 AsyncImage(url: url) { image in
                     image
                         .resizable()
@@ -100,8 +108,6 @@ struct ProfileView: View {
                     Image(systemName: "person.circle.fill")
                         .resizable()
                         .frame(width: 100, height: 100)
-                        .clipShape(Circle())
-                        .overlay(Circle().stroke(Color.gray, lineWidth: 2))
                 }
             } else {
                 Image(systemName: "person.circle.fill")
@@ -110,15 +116,10 @@ struct ProfileView: View {
                     .clipShape(Circle())
                     .overlay(Circle().stroke(Color.gray, lineWidth: 2))
             }
-            
-            // User name and email
-            Text(userViewModel.username.isEmpty ? "Kathrine Mils" : userViewModel.username)
+
+            Text(username)
                 .font(.custom("RobotoSerif-Regular", size: 18))
                 .bold()
-            
-            Text(userViewModel.email.isEmpty ? "kathrine@gmail.com" : userViewModel.email)
-                .font(.custom("RobotoSerif-Regular", size: 14))
-                .foregroundColor(.gray)
         }
         .padding(.bottom, 10)
     }
@@ -127,8 +128,8 @@ struct ProfileView: View {
     private var profileStats: some View {
         HStack(spacing: 50) { // Adjusted spacing between stats
             statView(number: posts.count, label: "Photos")
-            statView(number: userViewModel.followers, label: "Followers")
-            statView(number: userViewModel.following, label: "Follows")
+            statView(number: 150, label: "Followers") // Hardcoded values for followers/follows
+            statView(number: 80, label: "Follows")
         }
         .padding(.horizontal)
         .padding(.vertical, 10) // Add some padding around the stats section
@@ -164,6 +165,23 @@ struct ProfileView: View {
             self.posts = fetchedPosts
         }
     }
+
+    // Fetch user profile data from Firebase
+    private func fetchUserProfile() {
+        guard let userId = Auth.auth().currentUser?.uid else {
+            print("No user logged in.")
+            return
+        }
+
+        let ref = Database.database().reference().child("users").child(userId)
+        ref.observeSingleEvent(of: .value) { snapshot in
+            if let userData = snapshot.value as? [String: Any] {
+                self.username = userData["username"] as? String ?? "Unknown User"
+                self.bio = userData["bio"] as? String ?? "No bio available"
+                self.profileImageUrl = userData["profileImageUrl"] as? String ?? ""
+            }
+        }
+    }
 }
 
 // PostView for individual post grid cell
@@ -195,6 +213,7 @@ struct PostView: View {
         .cornerRadius(10)
     }
 }
+
 
 #Preview {
     ProfileView()
