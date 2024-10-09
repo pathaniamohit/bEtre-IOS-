@@ -3,7 +3,12 @@ import FirebaseAuth
 import FirebaseDatabase
 
 struct SignUpView: View {
-    @ObservedObject var userViewModel = UserViewModel()
+    @State private var username: String = ""
+    @State private var email: String = ""
+    @State private var phoneNumber: String = ""
+    @State private var password: String = ""
+    @State private var confirmPassword: String = ""
+    @State private var gender: String = "Male" // Default value
     @State private var isSignedUp = false
     @State private var navigateToLoginView: Bool = false
     @State private var navigateToContentView: Bool = false
@@ -41,7 +46,7 @@ struct SignUpView: View {
                         HStack {
                             Image(systemName: "person.fill")
                                 .foregroundColor(.black)
-                            TextField("Username", text: $userViewModel.username)
+                            TextField("Username", text: $username)
                                 .autocapitalization(.none)
                         }
                         .padding()
@@ -55,7 +60,7 @@ struct SignUpView: View {
                         HStack {
                             Image(systemName: "envelope.fill")
                                 .foregroundColor(.black)
-                            TextField("Email", text: $userViewModel.email)
+                            TextField("Email", text: $email)
                                 .keyboardType(.emailAddress)
                                 .autocapitalization(.none)
                         }
@@ -66,10 +71,11 @@ struct SignUpView: View {
                         .frame(width: 340)
                         .padding(.horizontal, 25)
 
+                        // Phone Number Field
                         HStack {
                             Image(systemName: "phone.fill")
                                 .foregroundColor(.black)
-                            TextField("Enter your Phone number", text: $userViewModel.phoneNumber)
+                            TextField("Enter your Phone number", text: $phoneNumber)
                                 .keyboardType(.phonePad)
                         }
                         .padding()
@@ -80,8 +86,9 @@ struct SignUpView: View {
                         .padding(.horizontal, 25)
                     }
 
+                    // Gender Picker
                     HStack(spacing: 40) {
-                        Picker("", selection: $userViewModel.gender) {
+                        Picker("", selection: $gender) {
                             Text("Male").tag("Male")
                             Text("Female").tag("Female")
                         }
@@ -91,13 +98,14 @@ struct SignUpView: View {
                     .padding(.horizontal, 25)
 
                     VStack(spacing: 16) {
+                        // Password Field
                         HStack {
                             Image(systemName: "lock.fill")
                                 .foregroundColor(.black)
                             if isPasswordVisible {
-                                TextField("Create your Password", text: $userViewModel.password)
+                                TextField("Create your Password", text: $password)
                             } else {
-                                SecureField("Create your Password", text: $userViewModel.password)
+                                SecureField("Create your Password", text: $password)
                             }
                             Button(action: {
                                 isPasswordVisible.toggle()
@@ -113,13 +121,14 @@ struct SignUpView: View {
                         .frame(width: 340)
                         .padding(.horizontal, 25)
 
+                        // Confirm Password Field
                         HStack {
                             Image(systemName: "lock.fill")
                                 .foregroundColor(.black)
                             if isConfirmPasswordVisible {
-                                TextField("Confirm your Password", text: $userViewModel.confirmPassword)
+                                TextField("Confirm your Password", text: $confirmPassword)
                             } else {
-                                SecureField("Confirm your Password", text: $userViewModel.confirmPassword)
+                                SecureField("Confirm your Password", text: $confirmPassword)
                             }
                             Button(action: {
                                 isConfirmPasswordVisible.toggle()
@@ -136,6 +145,7 @@ struct SignUpView: View {
                         .padding(.horizontal, 25)
                     }
 
+                    // Sign Up Button
                     Button(action: {
                         validateAndSignUp()
                     }) {
@@ -149,6 +159,7 @@ struct SignUpView: View {
                     }
                     .padding(.top, 20)
 
+                    // Navigation to Login View
                     Button(action: {
                         navigateToLoginView = true
                     }) {
@@ -177,31 +188,31 @@ struct SignUpView: View {
 
     private func validateAndSignUp() {
         // Validate inputs
-        if userViewModel.username.count < 8 {
+        if username.count < 8 {
             errorMessage = "Username must be at least 8 characters"
             showAlert = true
             return
         }
 
-        if !isValidEmail(userViewModel.email) {
+        if !isValidEmail(email) {
             errorMessage = "Enter a valid email"
             showAlert = true
             return
         }
 
-        if userViewModel.phoneNumber.count != 10 || !isValidPhone(userViewModel.phoneNumber) {
+        if phoneNumber.count != 10 || !isValidPhone(phoneNumber) {
             errorMessage = "Enter a valid 10-digit phone number"
             showAlert = true
             return
         }
 
-        if userViewModel.password.count < 8 {
+        if password.count < 8 {
             errorMessage = "Password must be at least 8 characters"
             showAlert = true
             return
         }
 
-        if userViewModel.password != userViewModel.confirmPassword {
+        if password != confirmPassword {
             errorMessage = "Passwords do not match"
             showAlert = true
             return
@@ -211,7 +222,7 @@ struct SignUpView: View {
     }
 
     private func createUserWithFirebase() {
-        Auth.auth().createUser(withEmail: userViewModel.email, password: userViewModel.password) { authResult, error in
+        Auth.auth().createUser(withEmail: email, password: password) { authResult, error in
             if let error = error {
                 errorMessage = error.localizedDescription
                 showAlert = true
@@ -221,10 +232,10 @@ struct SignUpView: View {
             guard let uid = authResult?.user.uid else { return }
             
             let userData: [String: Any] = [
-                "username": userViewModel.username,
-                "email": userViewModel.email,
-                "phoneNumber": userViewModel.phoneNumber,
-                "gender": userViewModel.gender,
+                "username": username,
+                "email": email,
+                "phoneNumber": phoneNumber,
+                "gender": gender,
                 "role": "user"
             ]
             
@@ -244,7 +255,7 @@ struct SignUpView: View {
     private func isValidEmail(_ email: String) -> Bool {
         // Validate email format
         let emailRegEx = "[A-Z0-9a-z._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,64}"
-        let emailPred = NSPredicate(format:"SELF MATCHES %@", emailRegEx)
+        let emailPred = NSPredicate(format: "SELF MATCHES %@", emailRegEx)
         return emailPred.evaluate(with: email)
     }
 
