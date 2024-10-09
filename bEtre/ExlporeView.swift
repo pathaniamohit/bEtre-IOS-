@@ -7,25 +7,32 @@
 
 
 import SwiftUI
+import Foundation
+import FirebaseDatabase
+import SDWebImageSwiftUI
 
-// Model for user posts
 struct UserPost: Identifiable {
-    var id = UUID()
-    var username: String
-    var imageName: String // Assume posts have an image
-    var caption: String
-    var isLiked: Bool
+    var id: String
+    var content: String
+    var imageUrl: String
+    var location: String
+    var timestamp: TimeInterval
+    var userId: String
+    var isLiked: Bool = false
+    
+    init(id: String, data: [String: Any]) {
+        self.id = id
+        self.content = data["content"] as? String ?? ""
+        self.imageUrl = data["imageUrl"] as? String ?? ""
+        self.location = data["location"] as? String ?? ""
+        self.timestamp = data["timestamp"] as? TimeInterval ?? 0
+        self.userId = data["userId"] as? String ?? ""
+    }
 }
 
-// Explore view to display posts
 struct ExploreView: View {
-    // Sample data
-    @State private var posts = [
-        UserPost(username: "friend1", imageName: "photo1", caption: "Beautiful sunset!", isLiked: false),
-        UserPost(username: "friend2", imageName: "photo2", caption: "At the beach 🏖️", isLiked: true),
-        UserPost(username: "user123", imageName: "photo3", caption: "Mountain vibes", isLiked: false),
-        UserPost(username: "user456", imageName: "photo4", caption: "Chilling with friends", isLiked: false)
-    ]
+    @State private var posts: [UserPost] = []
+    private var ref: DatabaseReference = Database.database().reference()
     
     var body: some View {
         NavigationView {
@@ -33,9 +40,8 @@ struct ExploreView: View {
                 LazyVStack(spacing: 16) {
                     ForEach($posts) { $post in
                         VStack(alignment: .leading) {
-                            // Post header with username
                             HStack {
-                                Text(post.username)
+                                Text(post.userId)
                                     .font(.headline)
                                     .padding(.leading)
                                 
@@ -43,33 +49,29 @@ struct ExploreView: View {
                             }
                             .padding(.top)
                             
-                            // Post image
-                            Image(post.imageName)
+                            WebImage(url: URL(string: post.imageUrl))
                                 .resizable()
                                 .aspectRatio(contentMode: .fill)
                                 .frame(maxWidth: .infinity, maxHeight: 300)
                                 .clipped()
                             
-                            // Like, Comment, Share buttons
+                           
                             HStack(spacing: 24) {
-                                // Like button
                                 Button(action: {
                                     post.isLiked.toggle()
+                                    updateLikeStatus(postId: post.id, isLiked: post.isLiked)
                                 }) {
                                     Image(systemName: post.isLiked ? "heart.fill" : "heart")
                                         .foregroundColor(post.isLiked ? .red : .primary)
                                 }
                                 
-                                // Comment button
                                 Button(action: {
-                                    // Navigate to comment section
+                                    
                                 }) {
                                     Image(systemName: "message")
                                 }
                                 
-                                // Share button
                                 Button(action: {
-                                    // Share action
                                 }) {
                                     Image(systemName: "square.and.arrow.up")
                                 }
@@ -79,12 +81,11 @@ struct ExploreView: View {
                             .padding(.leading)
                             .padding(.vertical, 8)
                             
-                            // Post caption
                             VStack(alignment: .leading) {
-                                Text(post.username)
+                                Text(post.userId)
                                     .font(.subheadline)
                                     .bold() +
-                                Text(" \(post.caption)")
+                                Text(" \(post.content)")
                                     .font(.subheadline)
                             }
                             .padding(.leading)
@@ -97,48 +98,28 @@ struct ExploreView: View {
                 .padding(.horizontal)
             }
             .navigationTitle("Explore")
-            .navigationBarItems(trailing: NavigationLink(destination: ChatView()) {
-                Image(systemName: "message.fill")
-                    .font(.title) // Adjust the size of the icon
-                    .foregroundColor(.primary) // Adjust color as needed
-            })
+            .onAppear(perform: fetchPosts)
         }
     }
-}
-
-
-struct ChatView: View {
-    var body: some View {
-        NavigationView {
-            List {
-                ForEach(0..<10, id: \.self) { index in
-                    NavigationLink(destination: IndividualChatView(username: "User \(index + 1)")) {
-                        Text("User \(index + 1)")
-                    }
+    
+    func fetchPosts() {
+        ref.child("posts").observe(.value) { snapshot in
+            var newPosts: [UserPost] = []
+            for child in snapshot.children {
+                if let childSnapshot = child as? DataSnapshot,
+                   let postData = childSnapshot.value as? [String: Any] {
+                    let post = UserPost(id: childSnapshot.key, data: postData)
+                    newPosts.append(post)
                 }
             }
-            .navigationTitle("Messages")
+            self.posts = newPosts
         }
     }
-}
-
-
-struct IndividualChatView: View {
-    var username: String
     
-    var body: some View {
-        VStack {
-            Text("Chat with \(username)")
-                .font(.largeTitle)
-                .padding()
-            // Here you can add more chat functionality
-            Spacer()
-        }
-        .navigationTitle(username)
+    func updateLikeStatus(postId: String, isLiked: Bool) {
+        ref.child("posts/\(postId)/isLiked").setValue(isLiked)
     }
 }
-
-// Preview
 struct ExploreView_Previews: PreviewProvider {
     static var previews: some View {
         ExploreView()
