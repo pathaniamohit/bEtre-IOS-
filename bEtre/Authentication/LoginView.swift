@@ -3,7 +3,8 @@ import FirebaseAuth
 import FirebaseDatabase
 
 struct LoginView: View {
-    @ObservedObject var userViewModel = UserViewModel()
+    @State private var loginEmail: String = ""
+    @State private var loginPassword: String = ""
     @State private var navigateToMaisonView: Bool = false
     @State private var navigateToAdminView: Bool = false
     @State private var navigateToSignUpView: Bool = false
@@ -38,7 +39,7 @@ struct LoginView: View {
                     HStack {
                         Image(systemName: "envelope")
                             .foregroundColor(.black)
-                        TextField("Email", text: $userViewModel.loginEmail)
+                        TextField("Email", text: $loginEmail)
                             .keyboardType(.emailAddress)
                             .autocapitalization(.none)
                     }
@@ -53,9 +54,9 @@ struct LoginView: View {
                             .foregroundColor(.black)
                         
                         if isPasswordVisible {
-                            TextField("Password", text: $userViewModel.loginPassword)
+                            TextField("Password", text: $loginPassword)
                         } else {
-                            SecureField("Password", text: $userViewModel.loginPassword)
+                            SecureField("Password", text: $loginPassword)
                         }
                         
                         Button(action: {
@@ -131,8 +132,8 @@ struct LoginView: View {
     }
     
     private func loginUser() {
-        let email = userViewModel.loginEmail
-        let password = userViewModel.loginPassword
+        let email = loginEmail
+        let password = loginPassword
         
         if email.isEmpty || !isValidEmail(email) {
             errorMessage = "Valid email is required"
