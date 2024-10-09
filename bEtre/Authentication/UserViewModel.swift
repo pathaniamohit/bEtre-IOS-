@@ -42,7 +42,7 @@ class UserViewModel: ObservableObject {
                 return
             }
             self?.isSignedUp = true
-            self?.saveAdditionalUserInfo() // Save username, phoneNumber, gender to Firestore if needed
+//            self?.saveAdditionalUserInfo() // Save username, phoneNumber, gender to Firestore if needed
             print("Sign-up successful")
         }
     }
@@ -84,23 +84,23 @@ class UserViewModel: ObservableObject {
     }
     
     // Optional: Save additional info like username, phone number, gender to Firestore
-    private func saveAdditionalUserInfo() {
-        guard let userId = Auth.auth().currentUser?.uid else { return }
-        let db = Firestore.firestore()
-        
-        db.collection("users").document(userId).setData([
-            "username": username,
-            "phoneNumber": phoneNumber,
-            "gender": gender
-        ]) { error in
-            if let error = error {
-                print("Error saving user info: \(error.localizedDescription)")
-            } else {
-                print("User info saved successfully")
-            }
-        }
-    }
-    
+//    private func saveAdditionalUserInfo() {
+//        guard let userId = Auth.auth().currentUser?.uid else { return }
+//        let db = Firestore.firestore()
+//        
+//        db.collection("users").document(userId).setData([
+//            "username": username,
+//            "phoneNumber": phoneNumber,
+//            "gender": gender
+//        ]) { error in
+//            if let error = error {
+//                print("Error saving user info: \(error.localizedDescription)")
+//            } else {
+//                print("User info saved successfully")
+//            }
+//        }
+//    }
+   
     func saveProfile() {
         guard let userId = Auth.auth().currentUser?.uid else {
             self.errorMessage = "User not logged in"
