@@ -21,7 +21,7 @@ class UserViewModel: ObservableObject {
     @Published var gender = "Male"
     @Published var followers: Int = 0
     @Published var following: Int = 0
-    @Published var bio: String = "" 
+    @Published var bio: String = ""
     @Published var loginEmail = ""
     @Published var loginPassword = ""
     
@@ -48,12 +48,8 @@ class UserViewModel: ObservableObject {
                 return
             }
             self?.isSignedUp = true
-<<<<<<< HEAD
-//            self?.saveAdditionalUserInfo() // Save username, phoneNumber, gender to Firestore if needed
-=======
             self?.userId = result?.user.uid ?? ""
             self?.saveAdditionalUserInfo()
->>>>>>> 0eb0c5f212305abebbb298d81c6fa4e555116b9c
             print("Sign-up successful")
         }
     }
@@ -71,72 +67,13 @@ class UserViewModel: ObservableObject {
                 return
             }
             self?.isLoggedIn = true
-            self?.userId = result?.user.uid ?? "" 
+            self?.userId = result?.user.uid ?? ""
             self?.loadUserProfile()
             print("Login successful")
         }
     }
     
-    func resetPassword() {
-        guard Utils.isValidEmail(forgotEmail) else {
-            self.errorMessage = "Invalid email for password reset"
-            return
-        }
-        
-        Auth.auth().sendPasswordReset(withEmail: forgotEmail) { [weak self] error in
-            if let error = error {
-                self?.errorMessage = error.localizedDescription
-                print("Password reset error: \(error.localizedDescription)")
-                return
-            }
-            self?.isPasswordReset = true
-            print("Password reset email sent")
-        }
-    }
     
-<<<<<<< HEAD
-    // Optional: Save additional info like username, phone number, gender to Firestore
-//    private func saveAdditionalUserInfo() {
-//        guard let userId = Auth.auth().currentUser?.uid else { return }
-//        let db = Firestore.firestore()
-//        
-//        db.collection("users").document(userId).setData([
-//            "username": username,
-//            "phoneNumber": phoneNumber,
-//            "gender": gender
-//        ]) { error in
-//            if let error = error {
-//                print("Error saving user info: \(error.localizedDescription)")
-//            } else {
-//                print("User info saved successfully")
-//            }
-//        }
-//    }
-   
-    func saveProfile() {
-        guard let userId = Auth.auth().currentUser?.uid else {
-            self.errorMessage = "User not logged in"
-            return
-        }
-        
-        let db = Firestore.firestore()
-        
-        // Update the user's information in Firestore
-        db.collection("users").document(userId).updateData([
-            "username": username,
-            "phoneNumber": phoneNumber,
-            "gender": gender
-        ]) { error in
-            if let error = error {
-                print("Error updating user info: \(error.localizedDescription)")
-                self.errorMessage = "Failed to update profile"
-            } else {
-                print("User info updated successfully")
-            }
-        }
-    }
-}
-=======
     private func saveAdditionalUserInfo() {
            guard let userId = Auth.auth().currentUser?.uid else { return }
            let ref = Database.database().reference().child("users/\(userId)")
@@ -189,4 +126,3 @@ class UserViewModel: ObservableObject {
            }
        }
    }
->>>>>>> 0eb0c5f212305abebbb298d81c6fa4e555116b9c
