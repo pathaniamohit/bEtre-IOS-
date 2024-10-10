@@ -2,7 +2,7 @@ import SwiftUI
 import Firebase
 import FirebaseAuth
 import FirebaseDatabase
-import Foundation
+import SDWebImageSwiftUI
 
 struct Post: Identifiable {
     var id: String
@@ -14,6 +14,9 @@ struct Post: Identifiable {
     var location: String
     var userId: String
     var timestamp: TimeInterval
+    var isViral: Bool
+    var isLiked: Bool = false
+    var likedBy: [String] = []
 
     init(id: String, data: [String: Any]) {
         self.id = id
@@ -25,8 +28,31 @@ struct Post: Identifiable {
         self.location = data["location"] as? String ?? ""
         self.userId = data["userId"] as? String ?? ""
         self.timestamp = data["timestamp"] as? TimeInterval ?? 0
+        self.isViral = data["isViral"] as? Bool ?? false
+        self.likedBy = data["likedBy"] as? [String] ?? []
+        if let currentUserId = Auth.auth().currentUser?.uid {
+            self.isLiked = likedBy.contains(currentUserId)
+        }
     }
 }
+
+
+struct Comment: Identifiable {
+    var id: String
+    var userId: String
+    var username: String
+    var content: String
+    var timestamp: TimeInterval
+
+    init(id: String, data: [String: Any]) {
+        self.id = id
+        self.userId = data["userId"] as? String ?? ""
+        self.username = data["username"] as? String ?? ""
+        self.content = data["content"] as? String ?? ""
+        self.timestamp = data["timestamp"] as? TimeInterval ?? 0
+    }
+}
+
 
 struct ProfileView: View {
     @State private var posts: [Post] = []
@@ -34,6 +60,8 @@ struct ProfileView: View {
     @State private var profileImageUrl: String = ""
     @State private var username: String = "Loading..."
     @State private var bio: String = "Loading bio..."
+    @State private var followerCount: Int = 0
+    @State private var followingCount: Int = 0
     
     let gridColumns = [
         GridItem(.flexible()),
@@ -46,7 +74,7 @@ struct ProfileView: View {
                 HStack {
                     Spacer()
                     Text("My Profile")
-                        .font(.custom("RobotoSerif-Regular", size: 24))
+                        .font(.title)
                         .bold()
                         .padding(.leading, 50)
                     Spacer()
@@ -54,27 +82,26 @@ struct ProfileView: View {
                         isShowingSettings = true
                     }) {
                         Image(systemName: "gear")
-                            .font(.system(size: 30))
+                            .font(.system(size: 24))
                             .foregroundColor(.primary)
                             .padding(.trailing, 16)
                     }
-
                 }
                 .padding(.top, 8)
                 
                 ScrollView {
                     VStack(spacing: 20) {
-                        profileHeader // Profile Image, Name, Email
+                        profileHeader
                         Text(bio)
-                            .font(.custom("RobotoSerif-Regular", size: 16))
-                            .padding()
-                            .foregroundColor(.gray)
+                            .font(.subheadline)
+                            .padding(.horizontal)
+                            .foregroundColor(.secondary)
                         
-                        profileStats // Photos, Followers, Following counts
+                        profileStats
                         
-                        LazyVGrid(columns: gridColumns, spacing: 10) { // 2-column grid for posts
-                            ForEach(posts) { post in
-                                PostView(post: post)
+                        LazyVGrid(columns: gridColumns, spacing: 10) {
+                            ForEach($posts) { $post in
+                                PostView(post: $post)
                             }
                         }
                         .padding(.horizontal)
@@ -83,69 +110,63 @@ struct ProfileView: View {
                     .onAppear {
                         fetchPostsForLoggedInUser()
                         fetchUserProfile()
+                        fetchFollowersCount()
+                        fetchFollowingCount()
                     }
                 }
-                .navigationBarHidden(true) // Hide the default navigation bar
+                .navigationBarHidden(true)
             }
             .fullScreenCover(isPresented: $isShowingSettings) {
                 SettingsView()
-                
             }
         }
     }
     
-    // Profile header for profile image, name, and email
     private var profileHeader: some View {
         VStack {
             if let url = URL(string: profileImageUrl) {
-                AsyncImage(url: url) { image in
-                    image
-                        .resizable()
-                        .frame(width: 100, height: 100)
-                        .clipShape(Circle())
-                        .overlay(Circle().stroke(Color.gray, lineWidth: 2))
-                } placeholder: {
-                    Image(systemName: "person.circle.fill")
-                        .resizable()
-                        .frame(width: 100, height: 100)
-                }
+                WebImage(url: url)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: 100, height: 100)
+                    .clipShape(Circle())
+                    .overlay(Circle().stroke(Color.gray, lineWidth: 2))
+                    .shadow(radius: 5)
             } else {
                 Image(systemName: "person.circle.fill")
                     .resizable()
                     .frame(width: 100, height: 100)
                     .clipShape(Circle())
                     .overlay(Circle().stroke(Color.gray, lineWidth: 2))
+                    .shadow(radius: 5)
             }
-
             Text(username)
-                .font(.custom("RobotoSerif-Regular", size: 18))
+                .font(.headline)
                 .bold()
         }
         .padding(.bottom, 10)
     }
     
-    // Profile statistics (Photos, Followers, Follows)
     private var profileStats: some View {
-        HStack(spacing: 50) { // Adjusted spacing between stats
+        HStack(spacing: 50) {
             statView(number: posts.count, label: "Photos")
-            statView(number: 150, label: "Followers") // Hardcoded values for followers/follows
-            statView(number: 80, label: "Follows")
+            statView(number: followerCount, label: "Followers")
+            statView(number: followingCount, label: "Follows")
         }
         .padding(.horizontal)
-        .padding(.vertical, 10) // Add some padding around the stats section
+        .padding(.vertical, 10)
     }
     
     private func statView(number: Int, label: String) -> some View {
         VStack {
             Text("\(number)")
-                .font(.custom("RobotoSerif-Regular", size: 16))
+                .font(.headline)
             Text(label)
-                .font(.custom("RobotoSerif-Regular", size: 12))
-                .foregroundColor(.gray)
+                .font(.subheadline)
+                .foregroundColor(.secondary)
         }
     }
     
-    // Fetch posts of the logged-in user from Firebase
     private func fetchPostsForLoggedInUser() {
         guard let userId = Auth.auth().currentUser?.uid else {
             print("No user logged in.")
@@ -166,7 +187,6 @@ struct ProfileView: View {
         }
     }
 
-    // Fetch user profile data from Firebase
     private func fetchUserProfile() {
         guard let userId = Auth.auth().currentUser?.uid else {
             print("No user logged in.")
@@ -175,44 +195,317 @@ struct ProfileView: View {
 
         let ref = Database.database().reference().child("users").child(userId)
         ref.observeSingleEvent(of: .value) { snapshot in
+            
             if let userData = snapshot.value as? [String: Any] {
                 self.username = userData["username"] as? String ?? "Unknown User"
                 self.bio = userData["bio"] as? String ?? "No bio available"
                 self.profileImageUrl = userData["profileImageUrl"] as? String ?? ""
+                let isViral = userData["isViral"] as? Bool ?? false
+                
             }
+
+        }
+    }
+    
+    private func fetchFollowersCount() {
+            guard let userId = Auth.auth().currentUser?.uid else {
+                return
+            }
+            let ref = Database.database().reference().child("followers").child(userId)
+            ref.observe(.value) { snapshot in
+                if let followersDict = snapshot.value as? [String: Any] {
+                    self.followerCount = followersDict.count
+                } else {
+                    self.followerCount = 0
+                }
+            }
+        }
+
+        
+        private func fetchFollowingCount() {
+            guard let userId = Auth.auth().currentUser?.uid else {
+                return
+            }
+            let ref = Database.database().reference().child("following").child(userId)
+            ref.observe(.value) { snapshot in
+                if let followingDict = snapshot.value as? [String: Any] {
+                    self.followingCount = followingDict.count
+                } else {
+                    self.followingCount = 0
+                }
+            }
+        }
+}
+
+
+
+struct PostView: View {
+    @Binding var post: Post
+    @State private var showComments = false
+    @State private var showLikes = false
+    @State private var showDeleteConfirmation = false
+    @State private var username: String = ""
+
+    var body: some View {
+        VStack(alignment: .leading) {
+            // Display poster's username
+            Text(username)
+                .font(.headline)
+                .padding([.leading, .top])
+
+            // Post Image
+            if let url = URL(string: post.imageUrl) {
+                WebImage(url: url)
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+                    .frame(height: 300)
+                    .clipped()
+            } else {
+                Color.gray.frame(height: 300) // Placeholder in case imageUrl is invalid
+            }
+
+            // Post Content
+            Text(post.content)
+                .font(.body)
+                .padding([.leading, .trailing, .top])
+
+            // Action Buttons
+            HStack(spacing: 20) {
+                // Like Button
+                Button(action: {
+                    toggleLike()
+                }) {
+                    Image(systemName: post.isLiked ? "heart.fill" : "heart")
+                        .foregroundColor(post.isLiked ? .red : .primary)
+                }
+
+                // Comment Button
+                Button(action: {
+                    showComments = true
+                }) {
+                    Image(systemName: "message")
+                }
+
+                if post.userId == Auth.auth().currentUser?.uid {
+                    // Delete Button
+                    Button(action: {
+                        showDeleteConfirmation = true
+                    }) {
+                        Image(systemName: "trash")
+                            .foregroundColor(.red)
+                    }
+                }
+            }
+            .padding([.leading, .trailing])
+
+            // Like and Comment Counts
+            HStack {
+                Button(action: {
+                    showLikes = true
+                }) {
+                    Text("\(post.countLike) Likes")
+                        .font(.subheadline)
+                        .foregroundColor(.gray)
+                }
+
+                Button(action: {
+                    showComments = true
+                }) {
+                    Text("\(post.countComment) Comments")
+                        .font(.subheadline)
+                        .foregroundColor(.gray)
+                }
+            }
+            .padding([.leading, .bottom])
+
+            // Navigation Links
+            .sheet(isPresented: $showComments) {
+                CommentsView(post: $post)
+            }
+            .sheet(isPresented: $showLikes) {
+                LikesView(likedBy: post.likedBy)
+            }
+            .alert(isPresented: $showDeleteConfirmation) {
+                Alert(
+                    title: Text("Delete Post"),
+                    message: Text("Are you sure you want to delete this post?"),
+                    primaryButton: .destructive(Text("Delete")) {
+                        deletePost()
+                    },
+                    secondaryButton: .cancel()
+                )
+            }
+        }
+        .background(Color.white)
+        .cornerRadius(10)
+        .shadow(radius: 5)
+        .onAppear {
+            fetchUsername()
+        }
+    }
+
+    func fetchUsername() {
+        let ref = Database.database().reference().child("users").child(post.userId)
+        ref.observeSingleEvent(of: .value) { snapshot in
+            if let userData = snapshot.value as? [String: Any] {
+                self.username = userData["username"] as? String ?? "Unknown User"
+            } else {
+                self.username = "Unknown User"
+            }
+        }
+    }
+    
+    func toggleLike() {
+           guard let userId = Auth.auth().currentUser?.uid else { return }
+           let ref = Database.database().reference()
+           let postRef = ref.child("posts").child(post.id)
+   
+           if post.isLiked {
+   
+               post.likedBy.removeAll { $0 == userId }
+               post.countLike -= 1
+           } else {
+   
+               post.likedBy.append(userId)
+               post.countLike += 1
+           }
+   
+           post.isLiked.toggle()
+           postRef.updateChildValues([
+               "likedBy": post.likedBy,
+               "count_like": post.countLike
+           ])
+       }
+   
+       func deletePost() {
+           let ref = Database.database().reference()
+           ref.child("posts").child(post.id).removeValue()
+       }
+
+    // ... rest of the code remains the same
+}
+
+
+
+struct CommentsView: View {
+    @Binding var post: Post
+    @State private var newComment = ""
+    @State private var comments: [Comment] = []
+
+    var body: some View {
+        VStack {
+            List(comments) { comment in
+                VStack(alignment: .leading) {
+                    Text(comment.username)
+                        .font(.headline)
+                    Text(comment.content)
+                        .font(.body)
+                }
+            }
+
+            HStack {
+                TextField("Add a comment...", text: $newComment)
+                    .textFieldStyle(RoundedBorderTextFieldStyle())
+                Button(action: {
+                    addComment()
+                }) {
+                    Text("Post")
+                }
+            }
+            .padding()
+        }
+        .onAppear {
+            fetchComments()
+        }
+    }
+
+    func fetchComments() {
+        let ref = Database.database().reference()
+        ref.child("comments").child(post.id).observe(.value) { snapshot in
+            var newComments: [Comment] = []
+            for child in snapshot.children {
+                if let snapshot = child as? DataSnapshot,
+                   let commentData = snapshot.value as? [String: Any] {
+                    let comment = Comment(id: snapshot.key, data: commentData)
+                    newComments.append(comment)
+                }
+            }
+            self.comments = newComments
+        }
+    }
+
+    func addComment() {
+        guard !newComment.isEmpty else { return }
+        let ref = Database.database().reference()
+        let commentId = ref.child("comments").child(post.id).childByAutoId().key ?? UUID().uuidString
+        let userId = Auth.auth().currentUser?.uid ?? ""
+        let username = Auth.auth().currentUser?.displayName ?? "Anonymous"
+
+        let commentData: [String: Any] = [
+            "userId": userId,
+            "username": username,
+            "content": newComment,
+            "timestamp": ServerValue.timestamp()
+        ]
+
+        ref.child("comments").child(post.id).child(commentId).setValue(commentData)
+        newComment = ""
+        post.countComment += 1
+        ref.child("posts").child(post.id).updateChildValues(["count_comment": post.countComment])
+    }
+}
+
+
+struct LikesView: View {
+    let likedBy: [String]
+    @State private var users: [User] = []
+    
+
+    var body: some View {
+        List(users) { user in
+            HStack {
+                if let url = URL(string: user.profileImageUrl) {
+                    AsyncImage(url: url) { image in
+                        image
+                            .resizable()
+                            .frame(width: 40, height: 40)
+                            .clipShape(Circle())
+                    } placeholder: {
+                        Image(systemName: "person.circle.fill")
+                            .resizable()
+                            .frame(width: 40, height: 40)
+                    }
+                }
+                Text(user.username)
+            }
+        }
+        .onAppear {
+            fetchUsers()
+        }
+    }
+
+    func fetchUsers() {
+        let ref = Database.database().reference()
+        var fetchedUsers: [User] = []
+
+        let group = DispatchGroup()
+        for userId in likedBy {
+            group.enter()
+            ref.child("users").child(userId).observeSingleEvent(of: .value) { snapshot in
+                if let userData = snapshot.value as? [String: Any] {
+                    let user = User(id: userId, data: userData)
+                    fetchedUsers.append(user)
+                }
+                group.leave()
+            }
+        }
+
+        group.notify(queue: .main) {
+            self.users = fetchedUsers
         }
     }
 }
 
-// PostView for individual post grid cell
-struct PostView: View {
-    let post: Post
-    
-    var body: some View {
-        VStack {
-            if let url = URL(string: post.imageUrl) {
-                AsyncImage(url: url) { image in
-                    image
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                } placeholder: {
-                    Color.gray
-                }
-                .frame(width: 150, height: 150) // Adjusted size for grid view
-                .clipped()
-            }
-            Text(post.content)
-                .font(.custom("RobotoSerif-Regular", size: 12))
-                .lineLimit(1)
-            Text(post.location)
-                .font(.custom("RobotoSerif-Regular", size: 12))
-                .foregroundColor(.gray)
-        }
-        .frame(width: 150, height: 180)
-        .background(Color.gray.opacity(0.2))
-        .cornerRadius(10)
-    }
-}
 
 
 #Preview {
