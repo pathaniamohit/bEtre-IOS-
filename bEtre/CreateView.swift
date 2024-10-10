@@ -137,7 +137,7 @@ struct CreateView: View {
         }
     }
     
-    // MARK: - Fetch User Info Method
+
     private func fetchUserInfo() {
         let ref = Database.database().reference().child("users").child(userId)
         
@@ -149,7 +149,7 @@ struct CreateView: View {
         }
     }
     
-    // MARK: - Clear Data
+  
     private func clearPostData() {
         postText = ""
         selectedImage = nil
@@ -157,7 +157,7 @@ struct CreateView: View {
         userInputLocation = ""
     }
     
-    // MARK: - Create Post Method
+  
     private func createPost() {
         isPosting = true
         
@@ -173,7 +173,7 @@ struct CreateView: View {
             "postId": postId,
             "userId": userId,
             "userName": userName,
-            "text": postText,
+            "content": postText,
             "timestamp": ServerValue.timestamp(),
             "location": location ?? ""
         ]
@@ -203,20 +203,47 @@ struct CreateView: View {
     }
     
     // MARK: - Upload Image Method
-    private func uploadImageToStorage(image: UIImage, completion: @escaping (String?) -> Void) {
+//    private func uploadImageToStorage(image: UIImage, completion: @escaping (String?) -> Void) {
+//        let storageRef = Storage.storage().reference().child("images/\(UUID().uuidString).jpg")
+//        if let imageData = image.jpegData(compressionQuality: 0.8) {
+//            storageRef.putData(imageData, metadata: nil) { metadata, error in
+//                if error == nil {
+//                    storageRef.downloadURL { url, error in
+//                        completion(url?.absoluteString)
+//                    }
+//                } else {
+//                    completion(nil)
+//                }
+//            }
+//        }
+//    }
+    
+    func uploadImageToStorage(image: UIImage, completion: @escaping (String?) -> Void) {
         let storageRef = Storage.storage().reference().child("images/\(UUID().uuidString).jpg")
         if let imageData = image.jpegData(compressionQuality: 0.8) {
             storageRef.putData(imageData, metadata: nil) { metadata, error in
                 if error == nil {
                     storageRef.downloadURL { url, error in
-                        completion(url?.absoluteString)
+                        if let url = url {
+                            print("Image uploaded successfully: \(url.absoluteString)")
+                            completion(url.absoluteString)
+                        } else {
+                            print("Error getting download URL: \(error?.localizedDescription ?? "Unknown error")")
+                            completion(nil)
+                        }
                     }
                 } else {
+                    print("Error uploading image: \(error?.localizedDescription ?? "Unknown error")")
                     completion(nil)
                 }
             }
+        } else {
+            print("Error converting image to data.")
+            completion(nil)
         }
     }
+
+
 }
 
 struct ImagePicker: UIViewControllerRepresentable {
@@ -253,3 +280,4 @@ struct ImagePicker: UIViewControllerRepresentable {
 #Preview {
     CreateView()
 }
+

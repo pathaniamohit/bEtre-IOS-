@@ -3,29 +3,30 @@ import Firebase
 import FirebaseAuth
 
 struct SettingsView: View {
-    @ObservedObject var userViewModel: UserViewModel
     @Environment(\.dismiss) var dismiss
     @State private var showLogoutAlert = false
-    @State private var isLoggedOut = false 
+    @State private var isLoggedOut = false
+    @State private var bio: String = "Your bio here"
+
     var body: some View {
         NavigationView {
             VStack {
                 List {
-                    NavigationLink(destination: EditProfileView(userViewModel: userViewModel)) {
+                    NavigationLink(destination: EditProfileView(bio: $bio)) {
                         Label("Edit Profile", systemImage: "pencil.circle")
                     }
                     .listRowBackground(Color.clear)
-                    
+
                     NavigationLink(destination: PrivacyScreen()) {
                         Label("Account and Privacy", systemImage: "lock.circle")
                     }
                     .listRowBackground(Color.clear)
-                    
+
                     NavigationLink(destination: AboutScreen()) {
                         Label("About", systemImage: "info.circle")
                     }
                     .listRowBackground(Color.clear)
-                    
+
                     Button(action: {
                         showLogoutAlert = true
                     }) {
@@ -37,11 +38,20 @@ struct SettingsView: View {
                 .listStyle(InsetGroupedListStyle())
             }
             .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button(action: {
+                        dismiss() 
+                    }) {
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 18, weight: .medium))
+                            .foregroundColor(.primary)
+                    }
+                }
+
                 ToolbarItem(placement: .principal) {
                     Text("Settings")
                         .font(.custom("RobotoSerif-Regular", size: 24))
                         .foregroundColor(.primary)
-                        .padding(.top, 30)
                 }
             }
             .alert(isPresented: $showLogoutAlert) {
@@ -58,7 +68,6 @@ struct SettingsView: View {
                 LoginView()
             }
         }
-        .background(Color.clear)
     }
 
     private func logoutUser() {
@@ -88,6 +97,5 @@ struct AboutScreen: View {
 }
 
 #Preview {
-    let mockUserViewModel = UserViewModel()
-    return SettingsView(userViewModel: mockUserViewModel)
+    SettingsView()
 }

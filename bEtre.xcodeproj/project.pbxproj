@@ -27,6 +27,7 @@
 		1815FE622CA792EA009000F9 /* ProfileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1815FE612CA792EA009000F9 /* ProfileView.swift */; };
 		1815FE642CAF6E9D009000F9 /* SplashScreenView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1815FE632CAF6E9D009000F9 /* SplashScreenView.swift */; };
 		1815FE662CAF7A03009000F9 /* EditProfileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1815FE652CAF7A03009000F9 /* EditProfileView.swift */; };
+		189EA73C2CB8580500820D64 /* UserProfileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 189EA73B2CB8580500820D64 /* UserProfileView.swift */; };
 		552651542CB4D64000E6B56A /* maison.swift in Sources */ = {isa = PBXBuildFile; fileRef = 552651532CB4D64000E6B56A /* maison.swift */; };
 		552651562CB4D80500E6B56A /* Admin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 552651552CB4D80500E6B56A /* Admin.swift */; };
 		552651582CB4DC7600E6B56A /* Dashboard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 552651572CB4DC7600E6B56A /* Dashboard.swift */; };
@@ -79,6 +80,7 @@
 		1815FE612CA792EA009000F9 /* ProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileView.swift; sourceTree = "<group>"; };
 		1815FE632CAF6E9D009000F9 /* SplashScreenView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplashScreenView.swift; sourceTree = "<group>"; };
 		1815FE652CAF7A03009000F9 /* EditProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditProfileView.swift; sourceTree = "<group>"; };
+		189EA73B2CB8580500820D64 /* UserProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserProfileView.swift; sourceTree = "<group>"; };
 		5526514F2CB4B8ED00E6B56A /* roboto_serif_italic.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; name = roboto_serif_italic.ttf; path = ../../roboto_serif_italic.ttf; sourceTree = "<group>"; };
 		552651502CB4B8ED00E6B56A /* amarante.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; name = amarante.ttf; path = ../../amarante.ttf; sourceTree = "<group>"; };
 		552651512CB4B8ED00E6B56A /* roboto_serif_regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; name = roboto_serif_regular.ttf; path = ../../roboto_serif_regular.ttf; sourceTree = "<group>"; };
@@ -154,6 +156,7 @@
 				5526514F2CB4B8ED00E6B56A /* roboto_serif_italic.ttf */,
 				552651512CB4B8ED00E6B56A /* roboto_serif_regular.ttf */,
 				5981C0862CB485B800FD00B1 /* SettingsView.swift */,
+				189EA73B2CB8580500820D64 /* UserProfileView.swift */,
 				1815FE612CA792EA009000F9 /* ProfileView.swift */,
 				1815FE5F2CA792D9009000F9 /* InboxView.swift */,
 				1815FE5D2CA792BF009000F9 /* CreateView.swift */,
@@ -333,6 +336,7 @@
 				1815FE462CA31AFB009000F9 /* SignUpView.swift in Sources */,
 				552651542CB4D64000E6B56A /* maison.swift in Sources */,
 				5526515E2CB4DCBF00E6B56A /* ProfileAdmin.swift in Sources */,
+				189EA73C2CB8580500820D64 /* UserProfileView.swift in Sources */,
 				5526515A2CB4DC8900E6B56A /* ActivityAdmin.swift in Sources */,
 				1815FE372CA31AB6009000F9 /* bEtreApp.swift in Sources */,
 				1815FE502CA32F08009000F9 /* SessionManager.swift in Sources */,
