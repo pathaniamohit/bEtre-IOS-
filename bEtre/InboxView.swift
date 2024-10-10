@@ -29,12 +29,12 @@ struct InboxView: View {
             List(messages) { message in
                 HStack {
                     VStack(alignment: .leading, spacing: 4) {
-                        // Display the sender name with a special marker for admin/moderator
+                        
                         Text(message.senderName)
                             .font(.headline)
                             .foregroundColor(message.isAdminOrModerator ? .red : .primary)
                         
-                        // Display a preview of the message
+                        
                         Text(message.messagePreview)
                             .font(.subheadline)
                             .foregroundColor(.secondary)
@@ -42,7 +42,7 @@ struct InboxView: View {
                     
                     Spacer()
                     
-                    // Show a new message indicator if applicable
+        
                     if message.isNewMessage {
                         Circle()
                             .foregroundColor(.blue)
