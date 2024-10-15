@@ -202,21 +202,7 @@ struct CreateView: View {
         }
     }
     
-    // MARK: - Upload Image Method
-//    private func uploadImageToStorage(image: UIImage, completion: @escaping (String?) -> Void) {
-//        let storageRef = Storage.storage().reference().child("images/\(UUID().uuidString).jpg")
-//        if let imageData = image.jpegData(compressionQuality: 0.8) {
-//            storageRef.putData(imageData, metadata: nil) { metadata, error in
-//                if error == nil {
-//                    storageRef.downloadURL { url, error in
-//                        completion(url?.absoluteString)
-//                    }
-//                } else {
-//                    completion(nil)
-//                }
-//            }
-//        }
-//    }
+
     
     func uploadImageToStorage(image: UIImage, completion: @escaping (String?) -> Void) {
         let storageRef = Storage.storage().reference().child("images/\(UUID().uuidString).jpg")
