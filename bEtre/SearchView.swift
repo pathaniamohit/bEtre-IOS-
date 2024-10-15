@@ -45,11 +45,9 @@ struct SearchView: View {
                     }
                 
                 ScrollView {
-                    // Viral / Latest Posts Section
+                
                     VStack(alignment: .leading) {
-//                        Text("Viral & Latest Posts")
-//                            .font(.headline)
-//                            .padding(.leading)
+
                         
                         ScrollView(.horizontal, showsIndicators: false) {
                             HStack(spacing: 10) {
@@ -86,50 +84,52 @@ struct SearchView: View {
                     Divider().padding(.vertical)
                     
                     
-                    VStack(alignment: .leading) {
-                        Text("Users")
-                            .font(.headline)
-                            .padding(.leading)
-                        
-                        
-                        ForEach(users.filter { searchText.isEmpty || $0.username.lowercased().contains(searchText.lowercased()) }) { user in
-                            NavigationLink(destination: UserProfileView(userId: user.id)) {
-                                HStack {
-                                    
-                                    if let url = URL(string: user.profileImageUrl) {
-                                        AsyncImage(url: url) { image in
-                                            image
-                                                .resizable()
-                                                .frame(width: 40, height: 40)
-                                                .clipShape(Circle())
-                                        } placeholder: {
+                  
+                    if !searchText.isEmpty {
+                        VStack(alignment: .leading) {
+                            Text("Users")
+                                .font(.headline)
+                                .padding(.leading)
+
+                            ForEach(users) { user in
+                                NavigationLink(destination: UserProfileView(userId: user.id)) {
+                                    HStack {
+                                      
+                                        if let url = URL(string: user.profileImageUrl) {
+                                            AsyncImage(url: url) { image in
+                                                image
+                                                    .resizable()
+                                                    .frame(width: 40, height: 40)
+                                                    .clipShape(Circle())
+                                            } placeholder: {
+                                                Image(systemName: "person.circle.fill")
+                                                    .resizable()
+                                                    .frame(width: 40, height: 40)
+                                            }
+                                        } else {
                                             Image(systemName: "person.circle.fill")
                                                 .resizable()
                                                 .frame(width: 40, height: 40)
                                         }
-                                    } else {
-                                        Image(systemName: "person.circle.fill")
-                                            .resizable()
-                                            .frame(width: 40, height: 40)
+
+                                     
+                                        Text(user.username)
+                                            .font(.subheadline)
+                                            .padding(.vertical, 8)
+
+                                        Spacer()
+
+                                        
+                                        if user.isViral {
+                                            Text("Viral")
+                                                .font(.caption)
+                                                .padding(4)
+                                                .background(Color.orange)
+                                                .cornerRadius(4)
+                                        }
                                     }
-                                    
-                                    
-                                    Text(user.username)
-                                        .font(.subheadline)
-                                        .padding(.vertical, 8)
-                                    
-                                    Spacer()
-                                    
-                                    
-                                    if user.isViral {
-                                        Text("Viral")
-                                            .font(.caption)
-                                            .padding(4)
-                                            .background(Color.orange)
-                                            .cornerRadius(4)
-                                    }
+                                    .padding(.horizontal)
                                 }
-                                .padding(.horizontal)
                             }
                         }
                     }
@@ -137,38 +137,34 @@ struct SearchView: View {
                 .navigationTitle("Search")
                 .onAppear {
                     fetchViralPosts()
-                    fetchAllUsers()
                 }
             }
         }
     }
-        
-        
-        
-        func fetchAllUsers() {
-            let ref = Database.database().reference().child("users")
-            ref.observe(.value) { snapshot in
-                var fetchedUsers: [User] = []
-                for child in snapshot.children {
-                    if let snapshot = child as? DataSnapshot,
-                       let userData = snapshot.value as? [String: Any] {
+
+
+    func searchUsers() {
+        guard !searchText.isEmpty else {
+            self.users = []
+            return
+        }
+
+        let ref = Database.database().reference().child("users")
+        ref.observeSingleEvent(of: .value) { snapshot in
+            var fetchedUsers: [User] = []
+            for child in snapshot.children {
+                if let snapshot = child as? DataSnapshot,
+                   let userData = snapshot.value as? [String: Any],
+                   let username = userData["username"] as? String {
+                    if username.lowercased().contains(searchText.lowercased()) {
                         let user = User(id: snapshot.key, data: userData)
                         fetchedUsers.append(user)
                     }
                 }
-                self.users = fetchedUsers
             }
+            self.users = fetchedUsers
         }
-        
-        
-        func searchUsers() {
-            if searchText.isEmpty {
-                fetchAllUsers()
-            } else {
-                self.users = self.users.filter { $0.username.lowercased().contains(searchText.lowercased()) }
-            }
-        }
-        
+    }
        
         func fetchViralPosts() {
             let ref = Database.database().reference().child("posts")
