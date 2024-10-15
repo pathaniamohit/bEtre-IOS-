@@ -238,22 +238,34 @@ struct ProfileView: View {
 }
 
 
-
 struct PostView: View {
     @Binding var post: Post
     @State private var showComments = false
-    @State private var showLikes = false
     @State private var showDeleteConfirmation = false
     @State private var username: String = ""
+    @State private var profileImageUrl: String = ""
 
     var body: some View {
         VStack(alignment: .leading) {
-            // Display poster's username
-            Text(username)
-                .font(.headline)
-                .padding([.leading, .top])
+            
+            HStack {
+                if let url = URL(string: profileImageUrl) {
+                    WebImage(url: url)
+                        .resizable()
+                        .frame(width: 40, height: 40)
+                        .clipShape(Circle())
+                } else {
+                    Image(systemName: "person.circle.fill")
+                        .resizable()
+                        .frame(width: 40, height: 40)
+                }
+                Text(username)
+                    .font(.headline)
+                Spacer()
+            }
+            .padding([.leading, .top])
 
-            // Post Image
+            
             if let url = URL(string: post.imageUrl) {
                 WebImage(url: url)
                     .resizable()
@@ -261,17 +273,17 @@ struct PostView: View {
                     .frame(height: 300)
                     .clipped()
             } else {
-                Color.gray.frame(height: 300) // Placeholder in case imageUrl is invalid
+                Color.gray.frame(height: 300)
             }
 
-            // Post Content
+            
             Text(post.content)
                 .font(.body)
                 .padding([.leading, .trailing, .top])
 
-            // Action Buttons
+            
             HStack(spacing: 20) {
-                // Like Button
+                
                 Button(action: {
                     toggleLike()
                 }) {
@@ -279,7 +291,7 @@ struct PostView: View {
                         .foregroundColor(post.isLiked ? .red : .primary)
                 }
 
-                // Comment Button
+                
                 Button(action: {
                     showComments = true
                 }) {
@@ -287,7 +299,6 @@ struct PostView: View {
                 }
 
                 if post.userId == Auth.auth().currentUser?.uid {
-                    // Delete Button
                     Button(action: {
                         showDeleteConfirmation = true
                     }) {
@@ -295,35 +306,24 @@ struct PostView: View {
                             .foregroundColor(.red)
                     }
                 }
+
+                Spacer()
             }
             .padding([.leading, .trailing])
 
-            // Like and Comment Counts
+        
             HStack {
-                Button(action: {
-                    showLikes = true
-                }) {
-                    Text("\(post.countLike) Likes")
-                        .font(.subheadline)
-                        .foregroundColor(.gray)
-                }
+                Text("\(post.countLike) Likes")
+                    .font(.subheadline)
+                    .foregroundColor(.gray)
 
-                Button(action: {
-                    showComments = true
-                }) {
-                    Text("\(post.countComment) Comments")
-                        .font(.subheadline)
-                        .foregroundColor(.gray)
-                }
+                Text("\(post.countComment) Comments")
+                    .font(.subheadline)
+                    .foregroundColor(.gray)
             }
             .padding([.leading, .bottom])
-
-            // Navigation Links
             .sheet(isPresented: $showComments) {
                 CommentsView(post: $post)
-            }
-            .sheet(isPresented: $showLikes) {
-                LikesView(likedBy: post.likedBy)
             }
             .alert(isPresented: $showDeleteConfirmation) {
                 Alert(
@@ -340,49 +340,56 @@ struct PostView: View {
         .cornerRadius(10)
         .shadow(radius: 5)
         .onAppear {
-            fetchUsername()
+            fetchUserData()
         }
     }
 
-    func fetchUsername() {
+    func fetchUserData() {
         let ref = Database.database().reference().child("users").child(post.userId)
         ref.observeSingleEvent(of: .value) { snapshot in
             if let userData = snapshot.value as? [String: Any] {
                 self.username = userData["username"] as? String ?? "Unknown User"
+                self.profileImageUrl = userData["profileImageUrl"] as? String ?? ""
             } else {
                 self.username = "Unknown User"
             }
         }
     }
-    
-    func toggleLike() {
-           guard let userId = Auth.auth().currentUser?.uid else { return }
-           let ref = Database.database().reference()
-           let postRef = ref.child("posts").child(post.id)
-   
-           if post.isLiked {
-   
-               post.likedBy.removeAll { $0 == userId }
-               post.countLike -= 1
-           } else {
-   
-               post.likedBy.append(userId)
-               post.countLike += 1
-           }
-   
-           post.isLiked.toggle()
-           postRef.updateChildValues([
-               "likedBy": post.likedBy,
-               "count_like": post.countLike
-           ])
-       }
-   
-       func deletePost() {
-           let ref = Database.database().reference()
-           ref.child("posts").child(post.id).removeValue()
-       }
 
-    // ... rest of the code remains the same
+
+    func toggleLike() {
+        guard let userId = Auth.auth().currentUser?.uid else { return }
+        let ref = Database.database().reference()
+        let postRef = ref.child("posts").child(post.id)
+
+        if post.isLiked {
+            
+            post.likedBy.removeAll { $0 == userId }
+            post.countLike -= 1
+        } else {
+            // Like the post
+            post.likedBy.append(userId)
+            post.countLike += 1
+        }
+
+        post.isLiked.toggle()
+
+        
+        postRef.updateChildValues([
+            "likedBy": post.likedBy,
+            "count_like": post.countLike
+        ])
+    }
+
+  
+    func deletePost() {
+        let ref = Database.database().reference()
+        ref.child("posts").child(post.id).removeValue()
+       
+        if let currentUserId = Auth.auth().currentUser?.uid {
+            ref.child("user-feeds").child(currentUserId).child(post.id).removeValue()
+        }
+    }
 }
 
 
@@ -394,12 +401,25 @@ struct CommentsView: View {
 
     var body: some View {
         VStack {
-            List(comments) { comment in
-                VStack(alignment: .leading) {
-                    Text(comment.username)
-                        .font(.headline)
-                    Text(comment.content)
-                        .font(.body)
+            List {
+                ForEach(comments) { comment in
+                    VStack(alignment: .leading) {
+                        HStack {
+                            Text(comment.username)
+                                .font(.headline)
+                            Spacer()
+                            if comment.userId == Auth.auth().currentUser?.uid {
+                                Button(action: {
+                                    deleteComment(comment)
+                                }) {
+                                    Image(systemName: "trash")
+                                        .foregroundColor(.red)
+                                }
+                            }
+                        }
+                        Text(comment.content)
+                            .font(.body)
+                    }
                 }
             }
 
@@ -426,31 +446,62 @@ struct CommentsView: View {
             for child in snapshot.children {
                 if let snapshot = child as? DataSnapshot,
                    let commentData = snapshot.value as? [String: Any] {
-                    let comment = Comment(id: snapshot.key, data: commentData)
+                    var comment = Comment(id: snapshot.key, data: commentData)
+
+    
+                    if comment.username.isEmpty {
+                        ref.child("users").child(comment.userId).observeSingleEvent(of: .value) { userSnapshot in
+                            if let userData = userSnapshot.value as? [String: Any],
+                               let fetchedUsername = userData["username"] as? String {
+                                comment.username = fetchedUsername
+                                
+                                if let index = newComments.firstIndex(where: { $0.id == comment.id }) {
+                                    newComments[index] = comment
+                                }
+                            }
+                        }
+                    }
                     newComments.append(comment)
                 }
             }
-            self.comments = newComments
+            self.comments = newComments.sorted(by: { $0.timestamp < $1.timestamp })
         }
     }
 
     func addComment() {
         guard !newComment.isEmpty else { return }
+        guard let userId = Auth.auth().currentUser?.uid else { return }
         let ref = Database.database().reference()
         let commentId = ref.child("comments").child(post.id).childByAutoId().key ?? UUID().uuidString
-        let userId = Auth.auth().currentUser?.uid ?? ""
-        let username = Auth.auth().currentUser?.displayName ?? "Anonymous"
 
-        let commentData: [String: Any] = [
-            "userId": userId,
-            "username": username,
-            "content": newComment,
-            "timestamp": ServerValue.timestamp()
-        ]
+        
+        ref.child("users").child(userId).observeSingleEvent(of: .value) { snapshot in
+            if let userData = snapshot.value as? [String: Any],
+               let username = userData["username"] as? String {
 
-        ref.child("comments").child(post.id).child(commentId).setValue(commentData)
-        newComment = ""
-        post.countComment += 1
+                let commentData: [String: Any] = [
+                    "userId": userId,
+                    "username": username,
+                    "content": newComment,
+                    "timestamp": ServerValue.timestamp()
+                ]
+
+                ref.child("comments").child(post.id).child(commentId).setValue(commentData)
+                newComment = ""
+                post.countComment += 1
+                ref.child("posts").child(post.id).updateChildValues(["count_comment": post.countComment])
+            } else {
+                print("User data not found or username missing.")
+            }
+        }
+    }
+
+    func deleteComment(_ comment: Comment) {
+        guard comment.userId == Auth.auth().currentUser?.uid else { return }
+        let ref = Database.database().reference()
+        ref.child("comments").child(post.id).child(comment.id).removeValue()
+
+        post.countComment -= 1
         ref.child("posts").child(post.id).updateChildValues(["count_comment": post.countComment])
     }
 }
