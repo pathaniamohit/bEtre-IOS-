@@ -28,12 +28,11 @@ struct CreateView: View {
     
     var body: some View {
         NavigationView {
-            VStack{
-                
+            VStack {
                 Text("Create Post")
-                                .font(.largeTitle)
-                                .fontWeight(.bold)
-                                .padding(.top, -70)
+                    .font(.largeTitle)
+                    .fontWeight(.bold)
+                    .padding(.top, -70)
                 
                 // Display user profile image and username
                 HStack {
@@ -149,7 +148,6 @@ struct CreateView: View {
         }
     }
     
-
     private func fetchUserInfo() {
         let ref = Database.database().reference().child("users").child(userId)
         
@@ -179,50 +177,63 @@ struct CreateView: View {
             return
         }
         
+        // First, check if there's an image to upload
+        if let image = selectedImage {
+            // Upload the image and get the URL
+            uploadImageToStorage(image: image) { imageUrl in
+                guard let imageUrl = imageUrl else {
+                    print("Failed to upload image")
+                    self.isPosting = false
+                    return
+                }
+                
+                // Create the post with the image URL
+                self.savePostData(imageUrl: imageUrl)
+            }
+        } else {
+            // No image to upload, save the post without an image URL
+            savePostData(imageUrl: nil)
+        }
+    }
+    
+    // Save post data to Firebase
+    private func savePostData(imageUrl: String?) {
         let postId = UUID().uuidString
         let ref = Database.database().reference().child("posts").child(postId)
+        
         var postData: [String: Any] = [
             "postId": postId,
             "userId": userId,
             "userName": userName,
             "content": postText,
             "timestamp": ServerValue.timestamp(),
-            "location": location ?? "",
-            "count_like": 0,
-            "count_comment": 0,
-            "is_reported": false
+            "location": location ?? ""
         ]
         
-        if let image = selectedImage {
-            uploadImageToStorage(image: image) { imageUrl in
-                postData["imageUrl"] = imageUrl
-                ref.setValue(postData) { error, _ in
-                    if let error = error {
-                        print("Error posting: \(error.localizedDescription)")
-                    } else {
-                        clearPostData()
-                    }
-                    isPosting = false
-                }
+        if let imageUrl = imageUrl {
+            postData["imageUrl"] = imageUrl
+        }
+        
+        ref.setValue(postData) { error, _ in
+            if let error = error {
+                print("Error posting: \(error.localizedDescription)")
+            } else {
+                clearPostData()
             }
-        } else {
-            ref.setValue(postData) { error, _ in
-                if let error = error {
-                    print("Error posting: \(error.localizedDescription)")
-                } else {
-                    clearPostData()
-                }
-                isPosting = false
-            }
+            isPosting = false
         }
     }
     
-
     // Upload selected image to Firebase Storage
     func uploadImageToStorage(image: UIImage, completion: @escaping (String?) -> Void) {
-        let storageRef = Storage.storage().reference().child("images/\(UUID().uuidString).jpg")
+        let storageRef = Storage.storage().reference().child("post_images/\(UUID().uuidString).jpg")
+        
         if let imageData = image.jpegData(compressionQuality: 0.8) {
-            storageRef.putData(imageData, metadata: nil) { metadata, error in
+            let metadata = StorageMetadata()
+            metadata.contentType = "image/jpeg"
+            metadata.customMetadata = ["userId": userId] // Adds userId metadata to validate user ownership in storage rules
+            
+            storageRef.putData(imageData, metadata: metadata) { metadata, error in
                 if error == nil {
                     storageRef.downloadURL { url, error in
                         if let url = url {
