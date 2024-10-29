@@ -28,7 +28,14 @@ struct CreateView: View {
     
     var body: some View {
         NavigationView {
-            VStack {
+            VStack{
+                
+                Text("Create Post")
+                                .font(.largeTitle)
+                                .fontWeight(.bold)
+                                .padding(.top, -70)
+                
+                // Display user profile image and username
                 HStack {
                     if let profileImageUrl = profileImageUrl, let url = URL(string: profileImageUrl) {
                         AsyncImage(url: url) { image in
@@ -48,9 +55,13 @@ struct CreateView: View {
                     }
                     Text(userName.isEmpty ? "Loading..." : userName)
                         .font(.headline)
+                    
+                    Spacer()
                 }
                 .padding()
+                .padding(.top, -40)
                 
+                // Post text field
                 TextField("Write something...", text: $postText)
                     .padding()
                     .frame(height: 150)
@@ -58,6 +69,7 @@ struct CreateView: View {
                     .cornerRadius(8)
                     .padding(.horizontal)
                 
+                // Image selection and location input buttons
                 VStack {
                     Button(action: {
                         showingImagePicker.toggle()
@@ -90,6 +102,7 @@ struct CreateView: View {
                 
                 Spacer()
                 
+                // Discard and Post buttons
                 HStack {
                     Button(action: {
                         clearPostData()
@@ -118,14 +131,13 @@ struct CreateView: View {
                 }
                 .padding(.bottom)
             }
-            .navigationTitle("Create Post")
             .sheet(isPresented: $showingImagePicker, content: {
                 ImagePicker(image: $selectedImage)
             })
             .alert("Enter Location", isPresented: $showingLocationInput) {
                 TextField("Enter location", text: $userInputLocation)
                 Button("Save", action: {
-                    location = userInputLocation 
+                    location = userInputLocation
                 })
                 Button("Cancel", role: .cancel, action: {})
             } message: {
@@ -143,13 +155,13 @@ struct CreateView: View {
         
         ref.observeSingleEvent(of: .value) { snapshot in
             if let userData = snapshot.value as? [String: Any] {
-                self.userName = userData["userName"] as? String ?? "Unknown User"
+                self.userName = userData["username"] as? String ?? "Unknown User"
                 self.profileImageUrl = userData["profileImageUrl"] as? String
             }
         }
     }
     
-  
+    // Clear post data fields
     private func clearPostData() {
         postText = ""
         selectedImage = nil
@@ -157,7 +169,7 @@ struct CreateView: View {
         userInputLocation = ""
     }
     
-  
+    // Create a post with text and optional image and location
     private func createPost() {
         isPosting = true
         
@@ -175,7 +187,10 @@ struct CreateView: View {
             "userName": userName,
             "content": postText,
             "timestamp": ServerValue.timestamp(),
-            "location": location ?? ""
+            "location": location ?? "",
+            "count_like": 0,
+            "count_comment": 0,
+            "is_reported": false
         ]
         
         if let image = selectedImage {
@@ -203,7 +218,7 @@ struct CreateView: View {
     }
     
 
-    
+    // Upload selected image to Firebase Storage
     func uploadImageToStorage(image: UIImage, completion: @escaping (String?) -> Void) {
         let storageRef = Storage.storage().reference().child("images/\(UUID().uuidString).jpg")
         if let imageData = image.jpegData(compressionQuality: 0.8) {
@@ -228,8 +243,6 @@ struct CreateView: View {
             completion(nil)
         }
     }
-
-
 }
 
 struct ImagePicker: UIViewControllerRepresentable {
@@ -266,4 +279,3 @@ struct ImagePicker: UIViewControllerRepresentable {
 #Preview {
     CreateView()
 }
-
