@@ -81,49 +81,90 @@ struct ExploreView: View {
             if let followingDict = snapshot.value as? [String: Any] {
                 followedUserIds = Array(followingDict.keys)
             }
-            
-            // Initialize an empty array to hold new posts
-            var newPosts: [UserPost] = []
-            
-            // Step 2: Fetch posts for each followed user
-            fetchUserPosts(followedUserIds: followedUserIds) { fetchedPosts in
-                self.posts = fetchedPosts.sorted(by: { $0.timestamp > $1.timestamp })
+
+            if followedUserIds.isEmpty {
+                // If no one is followed, fetch all posts
+                fetchAllPosts { fetchedPosts in
+                    self.posts = fetchedPosts.sorted(by: { $0.timestamp > $1.timestamp })
+                }
+            } else {
+                // If following others, fetch posts of followed users only
+                fetchPostsForUsers(userIds: followedUserIds) { fetchedPosts in
+                    self.posts = fetchedPosts.sorted(by: { $0.timestamp > $1.timestamp })
+                }
             }
         }
     }
 
-    private func fetchUserPosts(followedUserIds: [String], completion: @escaping ([UserPost]) -> Void) {
-        var fetchedPosts: [UserPost] = []
-        
-        for userId in followedUserIds {
-            ref.child("posts").queryOrdered(byChild: "userId").queryEqual(toValue: userId).observeSingleEvent(of: .value) { snapshot in
-                if snapshot.exists() {
-                    for child in snapshot.children {
-                        if let snapshot = child as? DataSnapshot,
-                           let postData = snapshot.value as? [String: Any] {
-                            var post = UserPost(id: snapshot.key, data: postData)
-                            
-                            // Fetch associated user details
-                            fetchUserData(for: post.userId) { userData in
-                                if let userData = userData {
-                                    post.username = userData.username
-                                    post.profileImageUrl = userData.profileImageUrl
-                                    post.email = userData.email
-                                }
-                                
-                                fetchedPosts.append(post)
-                                
-                                // Check if all posts are fetched, then call completion
-                                if fetchedPosts.count == followedUserIds.count {
-                                    completion(fetchedPosts)
-                                }
-                            }
+    private func fetchAllPosts(completion: @escaping ([UserPost]) -> Void) {
+        var allPosts: [UserPost] = []
+
+        ref.child("posts").observeSingleEvent(of: .value) { snapshot in
+            for child in snapshot.children {
+                if let snapshot = child as? DataSnapshot,
+                   let postData = snapshot.value as? [String: Any] {
+                    var post = UserPost(id: snapshot.key, data: postData)
+                    
+                    // Fetch user data for each post
+                    fetchUserData(for: post.userId) { userData in
+                        if let userData = userData {
+                            post.username = userData.username
+                            post.profileImageUrl = userData.profileImageUrl
+                            post.email = userData.email
+                        }
+                        
+                        allPosts.append(post)
+                        
+                        // When all posts are processed, call completion
+                        if allPosts.count == snapshot.childrenCount {
+                            completion(allPosts)
                         }
                     }
                 }
             }
         }
     }
+
+    private func fetchPostsForUsers(userIds: [String], completion: @escaping ([UserPost]) -> Void) {
+        var fetchedPosts: [UserPost] = []
+        var totalExpectedPosts = 0 // Track the total expected number of posts
+        
+        for userId in userIds {
+            ref.child("posts").queryOrdered(byChild: "userId").queryEqual(toValue: userId).observeSingleEvent(of: .value) { snapshot in
+                let postCount = snapshot.childrenCount
+                totalExpectedPosts += Int(postCount) // Increment expected count by the posts for this user
+                
+                for child in snapshot.children {
+                    if let snapshot = child as? DataSnapshot,
+                       let postData = snapshot.value as? [String: Any] {
+                        var post = UserPost(id: snapshot.key, data: postData)
+                        
+                        // Fetch user details
+                        fetchUserData(for: post.userId) { userData in
+                            if let userData = userData {
+                                post.username = userData.username
+                                post.profileImageUrl = userData.profileImageUrl
+                                post.email = userData.email
+                            }
+                            
+                            fetchedPosts.append(post) // Append the fetched post
+                            
+                            // Call completion only when all expected posts have been added
+                            if fetchedPosts.count == totalExpectedPosts {
+                                completion(fetchedPosts)
+                            }
+                        }
+                    }
+                }
+                
+                // If no posts exist for this user, check completion
+                if postCount == 0 && fetchedPosts.count == totalExpectedPosts {
+                    completion(fetchedPosts)
+                }
+            }
+        }
+    }
+
 
     private func fetchUserData(for userId: String, completion: @escaping (UserProfileData?) -> Void) {
         ref.child("users").child(userId).observeSingleEvent(of: .value) { snapshot in
@@ -153,7 +194,71 @@ struct ExploreView: View {
         var profileImageUrl: String
     }
     
+    func updateLikeStatus(postId: String, isLiked: Bool) {
+        guard let currentUserId = Auth.auth().currentUser?.uid else { return }
+        let postRef = ref.child("posts").child(postId)
+        
+        postRef.runTransactionBlock({ (currentData) -> TransactionResult in
+            if var post = currentData.value as? [String : AnyObject] {
+                var likedBy = post["likedBy"] as? [String] ?? []
+                var countLike = post["count_like"] as? Int ?? 0
+                if isLiked {
+                    if !likedBy.contains(currentUserId) {
+                        likedBy.append(currentUserId)
+                        countLike += 1
+                    }
+                } else {
+                    if let index = likedBy.firstIndex(of: currentUserId) {
+                        likedBy.remove(at: index)
+                        countLike -= 1
+                    }
+                }
+                post["likedBy"] = likedBy as AnyObject
+                post["count_like"] = countLike as AnyObject
+                currentData.value = post
+                return TransactionResult.success(withValue: currentData)
+            }
+            return TransactionResult.success(withValue: currentData)
+        })
+    }
     
+    func toggleFollowStatus(postOwnerId: String, isFollowing: Bool) {
+        guard let currentUserId = Auth.auth().currentUser?.uid else { return }
+        let followRef = ref.child("following").child(currentUserId).child(postOwnerId)
+        let followersRef = ref.child("followers").child(postOwnerId).child(currentUserId)
+
+        if isFollowing {
+            followRef.removeValue()
+            followersRef.removeValue()
+        } else {
+            followRef.setValue(true)
+            followersRef.setValue(true)
+        }
+    }
+
+    func reportPost(postId: String) {
+        let alert = UIAlertController(title: "Report Post", message: "Enter reason for reporting", preferredStyle: .alert)
+        alert.addTextField { textField in textField.placeholder = "Reason (optional)" }
+        alert.addAction(UIAlertAction(title: "Submit", style: .default, handler: { _ in
+            let reason = alert.textFields?.first?.text ?? "Inappropriate content"
+            submitReport(postId: postId, reason: reason)
+        }))
+        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+        if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+           let rootVC = windowScene.windows.first(where: { $0.isKeyWindow })?.rootViewController {
+            rootVC.present(alert, animated: true)
+        }
+    }
+
+    func submitReport(postId: String, reason: String) {
+        guard let currentUserId = Auth.auth().currentUser?.uid else { return }
+        let reportRef = ref.child("reports").child(postId).child(currentUserId)
+        reportRef.setValue(reason) { error, _ in
+            if error == nil {
+                ref.child("posts").child(postId).child("is_reported").setValue(true)
+            }
+        }
+    }
 }
 
 struct PostCardView: View {
