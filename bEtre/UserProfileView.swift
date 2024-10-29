@@ -5,17 +5,18 @@ import FirebaseDatabase
 import SDWebImageSwiftUI
 
 struct UserProfileView: View {
-    let userId: String // Passing user ID of specific user
-
+    let userId: String // ID of the profile being viewed
     @State private var posts: [Post] = []
     @State private var profileImageUrl: String = ""
     @State private var username: String = "Loading..."
     @State private var bio: String = "Loading bio..."
     @State private var followerCount: Int = 0
     @State private var followingCount: Int = 0
+    @State private var isFollowing = false // Track if current user is following
+    @State private var isCurrentUser = false // Track if viewing current user's profile
 
     var body: some View {
-        ScrollView { // Make the entire view scrollable
+        ScrollView {
             VStack {
                 profileHeader
 
@@ -43,10 +44,14 @@ struct UserProfileView: View {
             }
             .padding()
             .onAppear {
+                isCurrentUser = (Auth.auth().currentUser?.uid == userId) // Check if viewing own profile
                 fetchUserProfile()
                 fetchUserPosts()
                 fetchFollowerCount()
                 fetchFollowingCount()
+                if !isCurrentUser { // Only check following status if it's not the current user's profile
+                    checkIfFollowing()
+                }
             }
         }
     }
@@ -69,9 +74,26 @@ struct UserProfileView: View {
                     .overlay(Circle().stroke(Color.gray, lineWidth: 2))
                     .shadow(radius: 5)
             }
+            
             Text(username)
                 .font(.headline)
                 .bold()
+            
+            // Follow Button - Only visible if not viewing own profile
+            if !isCurrentUser {
+                Button(action: {
+                    toggleFollowStatus()
+                }) {
+                    Text(isFollowing ? "Following" : "Follow")
+                        .font(.subheadline)
+                        .padding()
+                        .frame(maxWidth: .infinity)
+                        .background(isFollowing ? Color.green : Color.blue)
+                        .foregroundColor(.white)
+                        .cornerRadius(10)
+                }
+                .padding(.top, 10)
+            }
         }
         .padding(.bottom, 10)
     }
@@ -142,6 +164,36 @@ struct UserProfileView: View {
                 self.followingCount = 0
             }
         }
+    }
+
+    private func checkIfFollowing() {
+        guard let currentUserId = Auth.auth().currentUser?.uid else { return }
+        let ref = Database.database().reference().child("followers").child(userId).child(currentUserId)
+        ref.observeSingleEvent(of: .value) { snapshot in
+            if let isFollowing = snapshot.value as? Bool {
+                self.isFollowing = isFollowing
+            }
+        }
+    }
+
+    private func toggleFollowStatus() {
+        guard let currentUserId = Auth.auth().currentUser?.uid else { return }
+        let followersRef = Database.database().reference().child("followers").child(userId).child(currentUserId)
+        let followingRef = Database.database().reference().child("following").child(currentUserId).child(userId)
+        
+        if isFollowing {
+            // Unfollow user
+            followersRef.setValue(nil)
+            followingRef.setValue(nil)
+            followerCount -= 1
+        } else {
+            // Follow user
+            followersRef.setValue(true)
+            followingRef.setValue(true)
+            followerCount += 1
+        }
+        
+        isFollowing.toggle()
     }
 }
 
