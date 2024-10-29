@@ -76,7 +76,6 @@ struct ProfileView: View {
                     Text("My Profile")
                         .font(.title)
                         .bold()
-                        .padding(.leading, 50)
                     Spacer()
                     Button(action: {
                         isShowingSettings = true
@@ -92,21 +91,17 @@ struct ProfileView: View {
                 ScrollView {
                     VStack(spacing: 20) {
                         profileHeader
-                        Text(bio)
-                            .font(.subheadline)
-                            .padding(.horizontal)
-                            .foregroundColor(.secondary)
                         
                         profileStats
                         
-                        LazyVGrid(columns: gridColumns, spacing: 10) {
-                            ForEach($posts) { $post in
-                                PostView(post: $post)
-                            }
-                        }
-                        .padding(.horizontal)
+                        LazyVStack(spacing: 10) { // LazyVStack for efficient vertical scrolling
+                                                    ForEach($posts) { $post in
+                                                        PostView(post: $post)
+                                                            .padding(.horizontal)
+                                                    }
+                                                }
                     }
-                    .padding(.top, 20)
+                    .padding(.top, 10)
                     .onAppear {
                         fetchPostsForLoggedInUser()
                         fetchUserProfile()
