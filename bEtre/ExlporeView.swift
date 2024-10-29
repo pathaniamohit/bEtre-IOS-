@@ -43,39 +43,39 @@ struct ExploreView: View {
     private var ref: DatabaseReference = Database.database().reference()
 
     var body: some View {
-        NavigationView {
-            VStack {
-                Text("bEtre")
-                    .font(.largeTitle)
-                    .bold()
-                    .padding()
+            NavigationView {
+                VStack {
+                    Text("bEtre")
+                        .font(.largeTitle)
+                        .bold()
+                        .padding()
 
-                ScrollView {
-                    LazyVStack(spacing: 16) {
-                        ForEach($posts) { $post in
-                            PostCardView(
-                                post: $post,
-                                updateLikeStatus: updateLikeStatus,
-                                toggleFollowStatus: toggleFollowStatus,
-                                openUserProfile: { userId in selectedUserId = IdentifiableString(id: userId) },
-                                reportPost: reportPost
-                            )
+                    ScrollView {
+                        LazyVStack(spacing: 16) {
+                            ForEach($posts) { $post in
+                                PostCardView(
+                                    post: $post,
+                                    updateLikeStatus: updateLikeStatus,
+                                    toggleFollowStatus: toggleFollowStatus,
+                                    addComment: addComment,
+                                    openUserProfile: { userId in selectedUserId = IdentifiableString(id: userId) },
+                                    reportPost: reportPost
+                                )
+                            }
                         }
+                        .padding(.horizontal)
                     }
-                    .padding(.horizontal)
+                    .onAppear(perform: fetchPosts)
                 }
-                .onAppear(perform: fetchPosts)
-            }
-            .sheet(item: $selectedUserId) { identifiableUserId in
-                UserProfileView(userId: identifiableUserId.id)
+                .sheet(item: $selectedUserId) { identifiableUserId in
+                    UserProfileView(userId: identifiableUserId.id)
+                }
             }
         }
-    }
 
     func fetchPosts() {
         guard let currentUserId = Auth.auth().currentUser?.uid else { return }
 
-        // Step 1: Fetch the list of users the current user is following
         ref.child("following").child(currentUserId).observeSingleEvent(of: .value) { snapshot in
             var followedUserIds: [String] = []
             if let followingDict = snapshot.value as? [String: Any] {
@@ -194,79 +194,114 @@ struct ExploreView: View {
         var profileImageUrl: String
     }
     
-    func updateLikeStatus(postId: String, isLiked: Bool) {
-        guard let currentUserId = Auth.auth().currentUser?.uid else { return }
-        let postRef = ref.child("posts").child(postId)
-        
-        postRef.runTransactionBlock({ (currentData) -> TransactionResult in
-            if var post = currentData.value as? [String : AnyObject] {
-                var likedBy = post["likedBy"] as? [String] ?? []
-                var countLike = post["count_like"] as? Int ?? 0
-                if isLiked {
-                    if !likedBy.contains(currentUserId) {
-                        likedBy.append(currentUserId)
-                        countLike += 1
-                    }
-                } else {
-                    if let index = likedBy.firstIndex(of: currentUserId) {
-                        likedBy.remove(at: index)
-                        countLike -= 1
-                    }
-                }
-                post["likedBy"] = likedBy as AnyObject
-                post["count_like"] = countLike as AnyObject
-                currentData.value = post
-                return TransactionResult.success(withValue: currentData)
-            }
-            return TransactionResult.success(withValue: currentData)
-        })
-    }
-    
-    func toggleFollowStatus(postOwnerId: String, isFollowing: Bool) {
-        guard let currentUserId = Auth.auth().currentUser?.uid else { return }
-        let followRef = ref.child("following").child(currentUserId).child(postOwnerId)
-        let followersRef = ref.child("followers").child(postOwnerId).child(currentUserId)
+        func toggleFollowStatus(postOwnerId: String, isFollowing: Bool) {
+            guard let currentUserId = Auth.auth().currentUser?.uid else { return }
+            let followRef = ref.child("following").child(currentUserId).child(postOwnerId)
+            let followersRef = ref.child("followers").child(postOwnerId).child(currentUserId)
+            let notificationsRef = ref.child("notifications").child(postOwnerId)
 
-        if isFollowing {
-            followRef.removeValue()
-            followersRef.removeValue()
-        } else {
-            followRef.setValue(true)
-            followersRef.setValue(true)
-        }
-    }
-
-    func reportPost(postId: String) {
-        let alert = UIAlertController(title: "Report Post", message: "Enter reason for reporting", preferredStyle: .alert)
-        alert.addTextField { textField in textField.placeholder = "Reason (optional)" }
-        alert.addAction(UIAlertAction(title: "Submit", style: .default, handler: { _ in
-            let reason = alert.textFields?.first?.text ?? "Inappropriate content"
-            submitReport(postId: postId, reason: reason)
-        }))
-        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
-        if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-           let rootVC = windowScene.windows.first(where: { $0.isKeyWindow })?.rootViewController {
-            rootVC.present(alert, animated: true)
-        }
-    }
-
-    func submitReport(postId: String, reason: String) {
-        guard let currentUserId = Auth.auth().currentUser?.uid else { return }
-        let reportRef = ref.child("reports").child(postId).child(currentUserId)
-        reportRef.setValue(reason) { error, _ in
-            if error == nil {
-                ref.child("posts").child(postId).child("is_reported").setValue(true)
+            if isFollowing {
+                followRef.removeValue()
+                followersRef.removeValue()
+                // Add unfollow notification
+                let notificationId = notificationsRef.childByAutoId().key
+                notificationsRef.child(notificationId ?? "").setValue([
+                    "username": Auth.auth().currentUser?.displayName ?? "",
+                    "type": "unfollow",
+                    "userId": currentUserId,
+                    "timestamp": ServerValue.timestamp()
+                ])
+            } else {
+                followRef.setValue(true)
+                followersRef.setValue(true)
+                // Add follow notification
+                let notificationId = notificationsRef.childByAutoId().key
+                notificationsRef.child(notificationId ?? "").setValue([
+                    "username": Auth.auth().currentUser?.displayName ?? "",
+                    "type": "follow",
+                    "userId": currentUserId,
+                    "timestamp": ServerValue.timestamp()
+                ])
             }
         }
-    }
+
+        // Update like status and add notification
+        func updateLikeStatus(postId: String, isLiked: Bool, postOwnerId: String) {
+            guard let currentUserId = Auth.auth().currentUser?.uid else { return }
+            let likesRef = ref.child("likes").child(postId).child(currentUserId)
+            let postRef = ref.child("posts").child(postId)
+            let notificationsRef = ref.child("notifications").child(postOwnerId)
+
+            if isLiked {
+                likesRef.setValue(true)
+                postRef.child("count_like").setValue(ServerValue.increment(1))
+                // Add like notification
+                let notificationId = notificationsRef.childByAutoId().key
+                notificationsRef.child(notificationId ?? "").setValue([
+                    "username": Auth.auth().currentUser?.displayName ?? "",
+                    "type": "like",
+                    "userId": currentUserId,
+                    "timestamp": ServerValue.timestamp()
+                ])
+            } else {
+                likesRef.removeValue()
+                postRef.child("count_like").setValue(ServerValue.increment(-1))
+            }
+        }
+
+        // Report a post
+        func reportPost(postId: String, reportContent: String) {
+            guard let currentUserId = Auth.auth().currentUser?.uid else { return }
+            let reportRef = ref.child("reports").child(postId).child(currentUserId)
+            let postRef = ref.child("posts").child(postId)
+            
+            reportRef.setValue(reportContent)
+            postRef.child("is_reported").setValue(true)
+        }
+
+        // Add a comment and notification
+        func addComment(postId: String, content: String, postOwnerId: String) {
+            guard let currentUserId = Auth.auth().currentUser?.uid else { return }
+            let commentsRef = ref.child("comments").child(postId)
+            let postRef = ref.child("posts").child(postId)
+            let notificationsRef = ref.child("notifications").child(postOwnerId)
+            let commentId = commentsRef.childByAutoId().key
+
+            let commentData: [String: Any] = [
+                "content": content,
+                "timestamp": ServerValue.timestamp(),
+                "userId": currentUserId,
+                "username": Auth.auth().currentUser?.displayName ?? ""
+            ]
+            
+            // Add comment data
+            commentsRef.child(commentId ?? "").setValue(commentData)
+            
+            // Increment comment count in post
+            postRef.child("count_comment").setValue(ServerValue.increment(1))
+            
+            // Add comment notification
+            let notificationId = notificationsRef.childByAutoId().key
+            notificationsRef.child(notificationId ?? "").setValue([
+                "username": Auth.auth().currentUser?.displayName ?? "",
+                "content": content,
+                "type": "comment",
+                "userId": currentUserId,
+                "timestamp": ServerValue.timestamp()
+            ])
+        }
 }
 
 struct PostCardView: View {
     @Binding var post: UserPost
-    var updateLikeStatus: (String, Bool) -> Void
+    var updateLikeStatus: (String, Bool, String) -> Void
     var toggleFollowStatus: (String, Bool) -> Void
+    var addComment: (String, String, String) -> Void
     var openUserProfile: (String) -> Void
-    var reportPost: (String) -> Void
+    var reportPost: (String, String) -> Void
+
+    @State private var isFollowing = false  // Track follow status of post owner
+    @State private var isLiked = false      // Track like status
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -291,15 +326,17 @@ struct PostCardView: View {
                 }
                 Spacer()
                 Button(action: {
-                    toggleFollowStatus(post.userId, post.isLiked)
+                    toggleFollowStatus(post.userId, isFollowing)
+                    isFollowing.toggle()
                 }) {
-                    Text(post.isLiked ? "Unfollow" : "Follow")
+                    Text(isFollowing ? "Unfollow" : "Follow")
                         .font(.subheadline)
                         .padding(5)
                         .background(Color.black)
                         .foregroundColor(.white)
                         .cornerRadius(5)
                 }
+                .onAppear { checkFollowStatus() }
             }
             
             if let url = URL(string: post.imageUrl) {
@@ -313,21 +350,24 @@ struct PostCardView: View {
 
             HStack(spacing: 20) {
                 Button(action: {
-                    post.isLiked.toggle()
-                    updateLikeStatus(post.id, post.isLiked)
+                    isLiked.toggle()
+                    updateLikeStatus(post.id, isLiked, post.userId)
                 }) {
-                    Image(systemName: post.isLiked ? "heart.fill" : "heart")
-                        .foregroundColor(post.isLiked ? .red : .primary)
+                    Image(systemName: isLiked ? "heart.fill" : "heart")
+                        .foregroundColor(isLiked ? .red : .primary)
                 }
                 Text("\(post.countLike)")
 
-                Button(action: {}) {
+                Button(action: {
+                    // Code for adding a comment (open a comment input dialog)
+                }) {
                     Image(systemName: "message")
                 }
                 Text("\(post.countComment)")
                 
                 Button(action: {
-                    reportPost(post.id)
+                    // Report post with content
+                    reportPost(post.id, "Inappropriate content")
                 }) {
                     Image(systemName: "exclamationmark.circle")
                         .foregroundColor(.orange)
@@ -353,5 +393,13 @@ struct PostCardView: View {
         .background(Color.white)
         .cornerRadius(10)
         .shadow(radius: 5)
+    }
+
+    private func checkFollowStatus() {
+        guard let currentUserId = Auth.auth().currentUser?.uid else { return }
+        let followRef = Database.database().reference().child("following").child(currentUserId).child(post.userId)
+        followRef.observeSingleEvent(of: .value) { snapshot in
+            isFollowing = snapshot.exists()
+        }
     }
 }
