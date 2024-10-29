@@ -34,6 +34,7 @@
 		5526515C2CB4DC9A00E6B56A /* InboxAdmin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5526515B2CB4DC9A00E6B56A /* InboxAdmin.swift */; };
 		5526515E2CB4DCBF00E6B56A /* ProfileAdmin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5526515D2CB4DCBF00E6B56A /* ProfileAdmin.swift */; };
 		558FEF012CCF20F2003C5B17 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 558FEF002CCF20F2003C5B17 /* GoogleService-Info.plist */; };
+		55C923EE2CD0894500EA97D3 /* EditPostView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 55C923ED2CD0894500EA97D3 /* EditPostView.swift */; };
 		5981C0872CB485B800FD00B1 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5981C0862CB485B800FD00B1 /* SettingsView.swift */; };
 		59E0CB132CB0AC0E00B64AA3 /* FirebaseAnalytics in Frameworks */ = {isa = PBXBuildFile; productRef = 59E0CB122CB0AC0E00B64AA3 /* FirebaseAnalytics */; };
 		59E0CB152CB0AC0E00B64AA3 /* FirebaseAnalyticsOnDeviceConversion in Frameworks */ = {isa = PBXBuildFile; productRef = 59E0CB142CB0AC0E00B64AA3 /* FirebaseAnalyticsOnDeviceConversion */; };
@@ -91,6 +92,7 @@
 		5526515B2CB4DC9A00E6B56A /* InboxAdmin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InboxAdmin.swift; sourceTree = "<group>"; };
 		5526515D2CB4DCBF00E6B56A /* ProfileAdmin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileAdmin.swift; sourceTree = "<group>"; };
 		558FEF002CCF20F2003C5B17 /* GoogleService-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
+		55C923ED2CD0894500EA97D3 /* EditPostView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditPostView.swift; sourceTree = "<group>"; };
 		5981C0862CB485B800FD00B1 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		59E0CB3F2CB45D9000B64AA3 /* ProfileImagePicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileImagePicker.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -150,6 +152,7 @@
 		1815FE352CA31AB6009000F9 /* bEtre */ = {
 			isa = PBXGroup;
 			children = (
+				55C923ED2CD0894500EA97D3 /* EditPostView.swift */,
 				5526515F2CB4DCEC00E6B56A /* Admin */,
 				552651522CB4B97200E6B56A /* Info.plist */,
 				552651502CB4B8ED00E6B56A /* amarante.ttf */,
@@ -319,6 +322,7 @@
 			files = (
 				552651562CB4D80500E6B56A /* Admin.swift in Sources */,
 				1815FE662CAF7A03009000F9 /* EditProfileView.swift in Sources */,
+				55C923EE2CD0894500EA97D3 /* EditPostView.swift in Sources */,
 				552651582CB4DC7600E6B56A /* Dashboard.swift in Sources */,
 				1815FE5E2CA792BF009000F9 /* CreateView.swift in Sources */,
 				1815FE622CA792EA009000F9 /* ProfileView.swift in Sources */,

@@ -86,7 +86,7 @@ struct ProfileView: View {
                             .padding(.trailing, 16)
                     }
                 }
-                .padding(.top, 8)
+                .padding(.top, -40)
                 
                 ScrollView {
                     VStack(spacing: 20) {
@@ -239,6 +239,7 @@ struct PostView: View {
     @State private var showDeleteConfirmation = false
     @State private var username: String = ""
     @State private var profileImageUrl: String = ""
+    @State private var showEditPostView = false
 
     var body: some View {
         VStack(alignment: .leading) {
@@ -336,6 +337,10 @@ struct PostView: View {
         .shadow(radius: 5)
         .onAppear {
             fetchUserData()
+        }
+        .onTapGesture(count: 2) { showEditPostView = true } // Double-tap to open EditPostView
+        .sheet(isPresented: $showEditPostView) {
+            EditPostView(post: post) // Pass `post` to EditPostView
         }
     }
 
