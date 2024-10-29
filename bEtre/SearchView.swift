@@ -14,6 +14,10 @@ struct User: Identifiable {
     }
 }
 
+struct UserID: Identifiable {
+    var id: String
+}
+
 struct Suggestion: Identifiable {
     var id = UUID()
     var text: String
@@ -31,6 +35,7 @@ struct SearchView: View {
     @State private var suggestions: [Suggestion] = []
     @State private var userIdToUsernameMap: [String: String] = [:]
     @State private var tags: [String] = ["All"]
+    @State private var selectedUserId: UserID? = nil
 
     var body: some View {
         ZStack(alignment: .top) {
@@ -128,6 +133,9 @@ struct SearchView: View {
                 .shadow(radius: 2)
                 .zIndex(1)
             }
+        }
+        .sheet(item: $selectedUserId) { userId in
+                UserProfileView(userId: userId.id)
         }
     }
 
@@ -251,7 +259,9 @@ struct SearchView: View {
             searchText = suggestion.text
             fetchPosts(query: suggestion.text)
         } else if suggestion.type == .username {
-            searchText = suggestion.text
+            if let userId = userIdToUsernameMap.first(where: { $0.value == suggestion.text.lowercased() })?.key {
+                selectedUserId = UserID(id: userId) // Wrap in UserID struct
+            }
         }
         suggestions.removeAll()
     }
