@@ -11,7 +11,8 @@ struct AdminProfileView: View {
     @State private var isImagePickerPresented = false
     @State private var imageData: Data?
     @State private var showLogoutAlert = false
-
+    @Environment(\.presentationMode) var presentationMode // Dismiss environment variable
+    
     private let storageRef = Storage.storage().reference()
     private let databaseRef = Database.database().reference()
 
@@ -20,7 +21,6 @@ struct AdminProfileView: View {
             VStack(spacing: 20) {
                 Text("My Profile")
                     .font(.custom("RobotoSerif-Bold", size: 30))
-                    .padding(.top, 40)
                 
                 VStack(spacing: 10) {
                     if let image = profileImage {
@@ -159,6 +159,7 @@ struct AdminProfileView: View {
         do {
             try Auth.auth().signOut()
             print("User logged out")
+            self.presentationMode.wrappedValue.dismiss() // Dismiss view after logout
         } catch let error {
             print("Logout failed: \(error.localizedDescription)")
         }

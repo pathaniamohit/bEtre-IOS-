@@ -29,6 +29,12 @@ struct CreateView: View {
     var body: some View {
         NavigationView {
             VStack {
+                Text("Create Post")
+                    .font(.largeTitle)
+                    .fontWeight(.bold)
+                    .padding(.top, -70)
+                
+                // Display user profile image and username
                 HStack {
                     if let profileImageUrl = profileImageUrl, let url = URL(string: profileImageUrl) {
                         AsyncImage(url: url) { image in
@@ -48,9 +54,13 @@ struct CreateView: View {
                     }
                     Text(userName.isEmpty ? "Loading..." : userName)
                         .font(.headline)
+                    
+                    Spacer()
                 }
                 .padding()
+                .padding(.top, -40)
                 
+                // Post text field
                 TextField("Write something...", text: $postText)
                     .padding()
                     .frame(height: 150)
@@ -58,6 +68,7 @@ struct CreateView: View {
                     .cornerRadius(8)
                     .padding(.horizontal)
                 
+                // Image selection and location input buttons
                 VStack {
                     Button(action: {
                         showingImagePicker.toggle()
@@ -90,6 +101,7 @@ struct CreateView: View {
                 
                 Spacer()
                 
+                // Discard and Post buttons
                 HStack {
                     Button(action: {
                         clearPostData()
@@ -118,14 +130,13 @@ struct CreateView: View {
                 }
                 .padding(.bottom)
             }
-            .navigationTitle("Create Post")
             .sheet(isPresented: $showingImagePicker, content: {
                 ImagePicker(image: $selectedImage)
             })
             .alert("Enter Location", isPresented: $showingLocationInput) {
                 TextField("Enter location", text: $userInputLocation)
                 Button("Save", action: {
-                    location = userInputLocation 
+                    location = userInputLocation
                 })
                 Button("Cancel", role: .cancel, action: {})
             } message: {
@@ -137,19 +148,18 @@ struct CreateView: View {
         }
     }
     
-
     private func fetchUserInfo() {
         let ref = Database.database().reference().child("users").child(userId)
         
         ref.observeSingleEvent(of: .value) { snapshot in
             if let userData = snapshot.value as? [String: Any] {
-                self.userName = userData["userName"] as? String ?? "Unknown User"
+                self.userName = userData["username"] as? String ?? "Unknown User"
                 self.profileImageUrl = userData["profileImageUrl"] as? String
             }
         }
     }
     
-  
+    // Clear post data fields
     private func clearPostData() {
         postText = ""
         selectedImage = nil
@@ -157,7 +167,7 @@ struct CreateView: View {
         userInputLocation = ""
     }
     
-  
+    // Create a post with text and optional image and location
     private func createPost() {
         isPosting = true
         
@@ -167,8 +177,30 @@ struct CreateView: View {
             return
         }
         
+        // First, check if there's an image to upload
+        if let image = selectedImage {
+            // Upload the image and get the URL
+            uploadImageToStorage(image: image) { imageUrl in
+                guard let imageUrl = imageUrl else {
+                    print("Failed to upload image")
+                    self.isPosting = false
+                    return
+                }
+                
+                // Create the post with the image URL
+                self.savePostData(imageUrl: imageUrl)
+            }
+        } else {
+            // No image to upload, save the post without an image URL
+            savePostData(imageUrl: nil)
+        }
+    }
+    
+    // Save post data to Firebase
+    private func savePostData(imageUrl: String?) {
         let postId = UUID().uuidString
         let ref = Database.database().reference().child("posts").child(postId)
+        
         var postData: [String: Any] = [
             "postId": postId,
             "userId": userId,
@@ -178,36 +210,30 @@ struct CreateView: View {
             "location": location ?? ""
         ]
         
-        if let image = selectedImage {
-            uploadImageToStorage(image: image) { imageUrl in
-                postData["imageUrl"] = imageUrl
-                ref.setValue(postData) { error, _ in
-                    if let error = error {
-                        print("Error posting: \(error.localizedDescription)")
-                    } else {
-                        clearPostData()
-                    }
-                    isPosting = false
-                }
+        if let imageUrl = imageUrl {
+            postData["imageUrl"] = imageUrl
+        }
+        
+        ref.setValue(postData) { error, _ in
+            if let error = error {
+                print("Error posting: \(error.localizedDescription)")
+            } else {
+                clearPostData()
             }
-        } else {
-            ref.setValue(postData) { error, _ in
-                if let error = error {
-                    print("Error posting: \(error.localizedDescription)")
-                } else {
-                    clearPostData()
-                }
-                isPosting = false
-            }
+            isPosting = false
         }
     }
     
-
-    
+    // Upload selected image to Firebase Storage
     func uploadImageToStorage(image: UIImage, completion: @escaping (String?) -> Void) {
-        let storageRef = Storage.storage().reference().child("images/\(UUID().uuidString).jpg")
+        let storageRef = Storage.storage().reference().child("post_images/\(UUID().uuidString).jpg")
+        
         if let imageData = image.jpegData(compressionQuality: 0.8) {
-            storageRef.putData(imageData, metadata: nil) { metadata, error in
+            let metadata = StorageMetadata()
+            metadata.contentType = "image/jpeg"
+            metadata.customMetadata = ["userId": userId] // Adds userId metadata to validate user ownership in storage rules
+            
+            storageRef.putData(imageData, metadata: metadata) { metadata, error in
                 if error == nil {
                     storageRef.downloadURL { url, error in
                         if let url = url {
@@ -228,8 +254,6 @@ struct CreateView: View {
             completion(nil)
         }
     }
-
-
 }
 
 struct ImagePicker: UIViewControllerRepresentable {
@@ -266,4 +290,3 @@ struct ImagePicker: UIViewControllerRepresentable {
 #Preview {
     CreateView()
 }
-
