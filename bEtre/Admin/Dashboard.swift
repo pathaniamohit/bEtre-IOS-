@@ -144,6 +144,9 @@ struct DashboardView: View {
                     Spacer()
                 }
             }
+            .navigationDestination(for: String.self) { userId in
+                UserProfileView(userId: userId)
+            }
         }
     }
     
@@ -180,7 +183,6 @@ struct DashboardView: View {
         }
     }
     
-    // Fetch post count by location
     private func fetchLocationData() {
         databaseRef.child("posts").observeSingleEvent(of: .value) { snapshot in
             var locationCounts: [String: Int] = [:]
@@ -194,7 +196,6 @@ struct DashboardView: View {
                 }
             }
             
-            // Convert to array of LocationData
             self.locationData = locationCounts.map { LocationData(location: $0.key, count: $0.value) }
         }
     }
@@ -204,7 +205,6 @@ struct DashboardView: View {
             var postOwnerMapping: [String: String] = [:]
             var commentsList: [CommentDisplayData] = []
             
-            // Step 1: Create a mapping of postId to postOwnerId
             for postChild in postsSnapshot.children {
                 if let postSnapshot = postChild as? DataSnapshot,
                    let postData = postSnapshot.value as? [String: Any],
@@ -213,7 +213,6 @@ struct DashboardView: View {
                 }
             }
             
-            // Step 2: Fetch comments and map them to the appropriate usernames
             databaseRef.child("comments").observeSingleEvent(of: .value) { commentsSnapshot in
                 for postCommentChild in commentsSnapshot.children {
                     if let postSnapshot = postCommentChild as? DataSnapshot {
@@ -244,7 +243,6 @@ struct DashboardView: View {
         }
     }
     
-    // Fetch usernames for both commenter and post owner
     private func fetchUsernames(commenterId: String, postOwnerId: String, completion: @escaping (String, String) -> Void) {
         let userRef = databaseRef.child("users")
         
@@ -257,7 +255,6 @@ struct DashboardView: View {
             }
         }
     }
-    
     
     private func searchUsers() {
         guard !searchText.isEmpty else {
@@ -282,7 +279,7 @@ struct DashboardView: View {
     private func navigateToUserProfile(user: AdminUser) {
         self.suggestions = []
         self.searchText = ""
-        self.navigationPath.append(user)
+        self.navigationPath.append(user.id) 
     }
 }
 
