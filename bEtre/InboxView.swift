@@ -11,8 +11,8 @@ struct InboxView: View {
                 Text("Inbox")
                     .font(.largeTitle)
                     .bold()
-                    .padding(.top, 20) // Add padding for spacing
-                    .padding(.bottom, 10) // Add spacing below the title
+                    .padding(.top, 20)
+                    .padding(.bottom, 10)
 
                 List(notifications) { notification in
                     VStack(alignment: .leading) {

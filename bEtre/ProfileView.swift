@@ -71,6 +71,9 @@ struct ProfileView: View {
             VStack {
                 HStack {
                     Spacer()
+                    Text("My Profile")
+                        .font(.custom("RobotoSerif-Bold", size: 30))
+                        .padding(.leading, 40)
                     Spacer()
                     Button(action: {
                         isShowingSettings = true

@@ -64,7 +64,7 @@ struct ExploreView: View {
             Text("Explore")
                             .font(.largeTitle)
                             .bold()
-                            .padding(.top, 20) // Add padding for spacing
+                            .padding(.top, 20)
                             .padding(.bottom, 10)
             ForEach(posts) { post in
                 VStack(alignment: .leading) {
@@ -180,7 +180,6 @@ struct ExploreView: View {
             "timestamp": Date().timeIntervalSince1970
         ]
 
-        // Merge additional data for flexibility with other notification types
         additionalData.forEach { key, value in
             notificationData[key] = value
         }
@@ -378,13 +377,11 @@ struct ExploreView: View {
         guard let postId = selectedPostID, !reportReason.isEmpty else { return }
         guard let userId = Auth.auth().currentUser?.uid else { return }
 
-        // Get postOwnerId from the selected post
         guard let postOwnerId = getPostOwnerId(for: postId) else {
             print("Post owner not found")
             return
         }
 
-        // Database reference to save the report
         let reportRef = Database.database().reference().child("reports").child(postId).child(userId)
         reportRef.setValue(reportReason) { error, _ in
             if error == nil {
@@ -589,7 +586,6 @@ struct CommentView: View {
             "timestamp": Date().timeIntervalSince1970
         ]
 
-        // Merge additional data for flexibility with other notification types
         additionalData.forEach { key, value in
             notificationData[key] = value
         }

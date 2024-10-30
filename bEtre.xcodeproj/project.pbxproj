@@ -152,12 +152,12 @@
 		1815FE352CA31AB6009000F9 /* bEtre */ = {
 			isa = PBXGroup;
 			children = (
-				55C923ED2CD0894500EA97D3 /* EditPostView.swift */,
-				5526515F2CB4DCEC00E6B56A /* Admin */,
 				552651522CB4B97200E6B56A /* Info.plist */,
 				552651502CB4B8ED00E6B56A /* amarante.ttf */,
 				5526514F2CB4B8ED00E6B56A /* roboto_serif_italic.ttf */,
 				552651512CB4B8ED00E6B56A /* roboto_serif_regular.ttf */,
+				5526515F2CB4DCEC00E6B56A /* Admin */,
+				55C923ED2CD0894500EA97D3 /* EditPostView.swift */,
 				5981C0862CB485B800FD00B1 /* SettingsView.swift */,
 				189EA73B2CB8580500820D64 /* UserProfileView.swift */,
 				1815FE612CA792EA009000F9 /* ProfileView.swift */,
