@@ -136,7 +136,7 @@ struct ExploreView: View {
                 .padding(.top, 8)
             }
         }
-        .onAppear(perform: loadPosts)
+        .onAppear(perform: loadFollowingAndPosts)
         .sheet(isPresented: $isCommentSheetPresented) {
             if let postId = selectedPostID {
                 CommentView(postId: postId)
@@ -144,19 +144,54 @@ struct ExploreView: View {
         }
     }
 
-    // Fetch Posts from Firebase, including owner username, email, and profile image URL
-    func loadPosts() {
+    // Load Following Users and Fetch Posts Based on Following Status
+    func loadFollowingAndPosts() {
+        let followingRef = Database.database().reference().child("following").child(currentUserId)
+        
+        followingRef.observeSingleEvent(of: .value) { snapshot in
+            if snapshot.exists() {
+                var followedUsers: Set<String> = []
+                
+                // Collect all followed user IDs
+                for child in snapshot.children {
+                    if let childSnapshot = child as? DataSnapshot, childSnapshot.value as? Bool == true {
+                        followedUsers.insert(childSnapshot.key)
+                    }
+                }
+                
+                self.followingUsers = followedUsers
+                
+                // Fetch posts based on following list
+                if followedUsers.isEmpty {
+                    // Fetch all posts excluding current user's posts if no following
+                    self.fetchAllPostsExcludingCurrentUser()
+                } else {
+                    // Fetch posts only from followed users
+                    self.fetchPostsFromFollowedUsers()
+                }
+            } else {
+                // No following data, fetch all posts excluding current user's posts
+                self.fetchAllPostsExcludingCurrentUser()
+            }
+        }
+    }
+
+    // Fetch Posts Only from Followed Users
+    func fetchPostsFromFollowedUsers() {
         let ref = Database.database().reference().child("posts")
         ref.observeSingleEvent(of: .value) { snapshot in
             var loadedPosts: [Post] = []
+            
             for child in snapshot.children {
                 if let snapshot = child as? DataSnapshot,
-                   let postDict = snapshot.value as? [String: Any] {
+                   let postDict = snapshot.value as? [String: Any],
+                   let userId = postDict["userId"] as? String, followingUsers.contains(userId) {
+                    
                     var post = Post(
                         id: snapshot.key,
                         content: postDict["content"] as? String ?? "",
                         timestamp: postDict["timestamp"] as? TimeInterval ?? 0,
-                        userId: postDict["userId"] as? String ?? "",
+                        userId: userId,
                         location: postDict["location"] as? String ?? "",
                         imageUrl: postDict["imageUrl"] as? String ?? "",
                         isReported: postDict["is_reported"] as? Bool ?? false,
@@ -164,7 +199,7 @@ struct ExploreView: View {
                         countComment: postDict["count_comment"] as? Int ?? 0
                     )
                     
-                    fetchUserData(for: post.userId) { username, email, profileImageUrl in
+                    fetchUserData(for: userId) { username, email, profileImageUrl in
                         post.username = username
                         post.email = email
                         post.profileImageUrl = profileImageUrl
@@ -175,6 +210,42 @@ struct ExploreView: View {
             }
         }
     }
+
+    // Fetch All Posts Excluding Current User's Posts
+    func fetchAllPostsExcludingCurrentUser() {
+        let ref = Database.database().reference().child("posts")
+        ref.observeSingleEvent(of: .value) { snapshot in
+            var loadedPosts: [Post] = []
+            
+            for child in snapshot.children {
+                if let snapshot = child as? DataSnapshot,
+                   let postDict = snapshot.value as? [String: Any],
+                   let userId = postDict["userId"] as? String, userId != currentUserId {
+                    
+                    var post = Post(
+                        id: snapshot.key,
+                        content: postDict["content"] as? String ?? "",
+                        timestamp: postDict["timestamp"] as? TimeInterval ?? 0,
+                        userId: userId,
+                        location: postDict["location"] as? String ?? "",
+                        imageUrl: postDict["imageUrl"] as? String ?? "",
+                        isReported: postDict["is_reported"] as? Bool ?? false,
+                        countLike: postDict["count_like"] as? Int ?? 0,
+                        countComment: postDict["count_comment"] as? Int ?? 0
+                    )
+                    
+                    fetchUserData(for: userId) { username, email, profileImageUrl in
+                        post.username = username
+                        post.email = email
+                        post.profileImageUrl = profileImageUrl
+                        loadedPosts.append(post)
+                        self.posts = loadedPosts
+                    }
+                }
+            }
+        }
+    }
+
 
     // Fetch User Data (username, email, profile image URL) using userId
     func fetchUserData(for userId: String, completion: @escaping (String, String, String) -> Void) {
