@@ -9,7 +9,7 @@ struct AppPost: Identifiable {
     var userId: String
     var imageUrl: String
     var content: String
-
+    
     init(id: String, data: [String: Any]) {
         self.id = id
         self.location = data["location"] as? String ?? ""
@@ -24,7 +24,7 @@ struct AppUser: Identifiable {
     var id: String
     var username: String
     var profileImageUrl: String
-
+    
     init(id: String, data: [String: Any]) {
         self.id = id
         self.username = data["username"] as? String ?? "Unknown"
@@ -55,7 +55,7 @@ struct SearchView: View {
     @State private var userIdToUsernameMap: [String: String] = [:]
     @State private var tags: [String] = ["All"]
     @State private var selectedUserId: UserID? = nil
-
+    
     var body: some View {
         ZStack(alignment: .top) {
             VStack {
@@ -73,7 +73,7 @@ struct SearchView: View {
                             searchUsersAndLocations()
                         }
                     }
-
+                
                 // Tags ScrollView
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack {
@@ -92,9 +92,9 @@ struct SearchView: View {
                     }
                     .padding(.horizontal)
                 }
-
+                
                 Divider().padding(.vertical)
-
+                
                 // Displaying posts
                 ScrollView {
                     LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 15) {
@@ -125,7 +125,7 @@ struct SearchView: View {
                 fetchUsers()
                 fetchUniqueLocations()
             }
-
+            
             // Suggestions View
             if !suggestions.isEmpty {
                 VStack(alignment: .leading) {
@@ -161,14 +161,14 @@ struct SearchView: View {
             UserProfileView(userId: userId.id)
         }
     }
-
+    
     // Fetch users from Firebase
     func fetchUsers() {
         let ref = Database.database().reference().child("users")
         ref.observeSingleEvent(of: .value) { snapshot in
             var fetchedUsers: [AppUser] = []
             var fetchedUsernames: [String: String] = [:]
-
+            
             for child in snapshot.children {
                 if let snapshot = child as? DataSnapshot,
                    let userData = snapshot.value as? [String: Any],
@@ -179,17 +179,17 @@ struct SearchView: View {
                     fetchedUsers.append(user)
                 }
             }
-
+            
             self.users = fetchedUsers
             self.userIdToUsernameMap = fetchedUsernames
         }
     }
-
+    
     func searchUsersAndLocations() {
         searchUsers()
         filterSuggestions(for: searchText)
     }
-
+    
     func searchUsers() {
         let ref = Database.database().reference().child("users")
         ref.observeSingleEvent(of: .value) { snapshot in
@@ -206,17 +206,17 @@ struct SearchView: View {
             self.users = fetchedUsers
         }
     }
-
+    
     func filterSuggestions(for query: String) {
         suggestions.removeAll()
-
+        
         // Add username suggestions
         for (userId, username) in userIdToUsernameMap {
             if username.contains(query.lowercased()) {
                 suggestions.append(Suggestion(text: username, type: .username))
             }
         }
-
+        
         // Add location suggestions
         let ref = Database.database().reference().child("posts")
         ref.observeSingleEvent(of: .value) { snapshot in
@@ -229,7 +229,7 @@ struct SearchView: View {
             }
         }
     }
-
+    
     // Fetch posts with query
     func fetchPosts(query: String) {
         let ref = Database.database().reference().child("posts")
@@ -251,7 +251,7 @@ struct SearchView: View {
             self.posts = fetchedPosts
         }
     }
-
+    
     // Fetch all posts
     func fetchAllPosts() {
         let ref = Database.database().reference().child("posts")
@@ -269,7 +269,7 @@ struct SearchView: View {
             self.posts = fetchedPosts
         }
     }
-
+    
     // Fetch unique locations
     func fetchUniqueLocations() {
         let ref = Database.database().reference().child("posts")
@@ -285,7 +285,7 @@ struct SearchView: View {
             tags = ["All"] + shuffledLocations
         }
     }
-
+    
     // Handle suggestion click
     func handleSuggestionClick(_ suggestion: Suggestion) {
         if suggestion.type == .location {

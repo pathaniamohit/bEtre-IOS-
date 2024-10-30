@@ -58,14 +58,14 @@ struct ExploreView: View {
     @State private var selectedPostCommentCount: Int = 0
     @State private var isReportDialogPresented: Bool = false
     @State private var reportReason: String = ""
-
+    
     var body: some View {
         ScrollView {
             Text("Explore")
-                            .font(.largeTitle)
-                            .bold()
-                            .padding(.top, 20)
-                            .padding(.bottom, 10)
+                .font(.largeTitle)
+                .bold()
+                .padding(.top, 20)
+                .padding(.bottom, 10)
             ForEach(posts) { post in
                 VStack(alignment: .leading) {
                     HStack {
@@ -80,7 +80,7 @@ struct ExploreView: View {
                                 .resizable()
                                 .frame(width: 40, height: 40)
                         }
-
+                        
                         // Display Username and Email
                         VStack(alignment: .leading) {
                             Text(post.username)
@@ -89,9 +89,9 @@ struct ExploreView: View {
                                 .font(.caption)
                                 .foregroundColor(.gray)
                         }
-
+                        
                         Spacer()
-
+                        
                         // Follow/Unfollow Button
                         Button(action: {
                             toggleFollow(userId: post.userId)
@@ -101,7 +101,7 @@ struct ExploreView: View {
                                 .foregroundColor(.blue)
                         }
                     }
-
+                    
                     // Post Image
                     if let url = URL(string: post.imageUrl) {
                         AsyncImage(url: url) { image in
@@ -110,7 +110,7 @@ struct ExploreView: View {
                             ProgressView()
                         }
                     }
-
+                    
                     // Post Actions (Like, Comment, Report)
                     HStack {
                         Button(action: {
@@ -120,7 +120,7 @@ struct ExploreView: View {
                                 .foregroundColor(.red)
                         }
                         Text("\(post.countLike)")
-
+                        
                         Button(action: {
                             selectedPostID = post.id
                             selectedPostCommentCount = post.countComment
@@ -128,16 +128,16 @@ struct ExploreView: View {
                         }) {
                             Image(systemName: "message")
                         }
-
+                        
                         Button(action: {
                             selectedPostID = post.id
                             isReportDialogPresented = true
-                                        }) {
+                        }) {
                             Image(systemName: "exclamationmark.triangle")
-                            .foregroundColor(.orange)
+                                .foregroundColor(.orange)
                         }
                     }
-
+                    
                     // Post Description and Location
                     Text(post.content)
                         .font(.subheadline)
@@ -155,31 +155,31 @@ struct ExploreView: View {
         }
         .onAppear(perform: loadFollowingAndPosts)
         .alert("Report Post", isPresented: $isReportDialogPresented, actions: {
-                    TextField("Reason for reporting...", text: $reportReason)
-                    Button("Submit", action: submitReport)
-                    Button("Cancel", role: .cancel, action: { isReportDialogPresented = false })
-                }, message: {
-                    Text("Please specify your reason for reporting this post.")
-                })
+            TextField("Reason for reporting...", text: $reportReason)
+            Button("Submit", action: submitReport)
+            Button("Cancel", role: .cancel, action: { isReportDialogPresented = false })
+        }, message: {
+            Text("Please specify your reason for reporting this post.")
+        })
         .sheet(isPresented: $isCommentSheetPresented) {
             if let postId = selectedPostID, let postOwnerId = getPostOwnerId(for: postId) {
                 CommentView(postId: postId, postOwnerId: postOwnerId, commentCount: $selectedPostCommentCount)
             }
         }
-
+        
     }
     
     // Save Notification to Firebase Realtime Database
     func saveNotification(to userId: String, type: String, additionalData: [String: Any] = [:]) {
         let notificationRef = Database.database().reference().child("notifications").child(userId)
         let notificationId = notificationRef.childByAutoId().key ?? UUID().uuidString
-
+        
         var notificationData: [String: Any] = [
             "type": type,
             "userId": currentUserId,
             "timestamp": Date().timeIntervalSince1970
         ]
-
+        
         additionalData.forEach { key, value in
             notificationData[key] = value
         }
@@ -188,66 +188,66 @@ struct ExploreView: View {
     }
     
     // Load Following Users and Fetch Posts Based on Following Status
-        func loadFollowingAndPosts() {
-            let followingRef = Database.database().reference().child("following").child(currentUserId)
+    func loadFollowingAndPosts() {
+        let followingRef = Database.database().reference().child("following").child(currentUserId)
+        
+        followingRef.observeSingleEvent(of: .value) { snapshot in
+            var followedUsers: Set<String> = []
             
-            followingRef.observeSingleEvent(of: .value) { snapshot in
-                var followedUsers: Set<String> = []
-                
-                for child in snapshot.children {
-                    if let childSnapshot = child as? DataSnapshot, childSnapshot.value as? Bool == true {
-                        followedUsers.insert(childSnapshot.key)
-                    }
-                }
-                
-                self.followingUsers = followedUsers
-                
-                // Fetch posts based on following list
-                if followedUsers.isEmpty {
-                    // Fetch all posts excluding current user's posts if no following
-                    self.fetchAllPostsExcludingCurrentUser()
-                } else {
-                    // Fetch posts only from followed users
-                    self.fetchPostsFromFollowedUsers()
+            for child in snapshot.children {
+                if let childSnapshot = child as? DataSnapshot, childSnapshot.value as? Bool == true {
+                    followedUsers.insert(childSnapshot.key)
                 }
             }
+            
+            self.followingUsers = followedUsers
+            
+            // Fetch posts based on following list
+            if followedUsers.isEmpty {
+                // Fetch all posts excluding current user's posts if no following
+                self.fetchAllPostsExcludingCurrentUser()
+            } else {
+                // Fetch posts only from followed users
+                self.fetchPostsFromFollowedUsers()
+            }
         }
-
-        // Fetch Posts Only from Followed Users
-        func fetchPostsFromFollowedUsers() {
-            let ref = Database.database().reference().child("posts")
-            ref.observeSingleEvent(of: .value) { snapshot in
-                var loadedPosts: [Post] = []
-                
-                for child in snapshot.children {
-                    if let snapshot = child as? DataSnapshot,
-                       let postDict = snapshot.value as? [String: Any],
-                       let userId = postDict["userId"] as? String, followingUsers.contains(userId) {
-                        
-                        var post = Post(
-                            id: snapshot.key,
-                            content: postDict["content"] as? String ?? "",
-                            timestamp: postDict["timestamp"] as? TimeInterval ?? 0,
-                            userId: userId,
-                            location: postDict["location"] as? String ?? "",
-                            imageUrl: postDict["imageUrl"] as? String ?? "",
-                            isReported: postDict["is_reported"] as? Bool ?? false,
-                            countLike: postDict["count_like"] as? Int ?? 0,
-                            countComment: postDict["count_comment"] as? Int ?? 0,
-                            isLiked: likedPosts.contains(snapshot.key)
-                        )
-                        
-                        fetchUserData(for: userId) { username, email, profileImageUrl in
-                            post.username = username
-                            post.email = email
-                            post.profileImageUrl = profileImageUrl
-                            loadedPosts.append(post)
-                            self.posts = loadedPosts
-                        }
+    }
+    
+    // Fetch Posts Only from Followed Users
+    func fetchPostsFromFollowedUsers() {
+        let ref = Database.database().reference().child("posts")
+        ref.observeSingleEvent(of: .value) { snapshot in
+            var loadedPosts: [Post] = []
+            
+            for child in snapshot.children {
+                if let snapshot = child as? DataSnapshot,
+                   let postDict = snapshot.value as? [String: Any],
+                   let userId = postDict["userId"] as? String, followingUsers.contains(userId) {
+                    
+                    var post = Post(
+                        id: snapshot.key,
+                        content: postDict["content"] as? String ?? "",
+                        timestamp: postDict["timestamp"] as? TimeInterval ?? 0,
+                        userId: userId,
+                        location: postDict["location"] as? String ?? "",
+                        imageUrl: postDict["imageUrl"] as? String ?? "",
+                        isReported: postDict["is_reported"] as? Bool ?? false,
+                        countLike: postDict["count_like"] as? Int ?? 0,
+                        countComment: postDict["count_comment"] as? Int ?? 0,
+                        isLiked: likedPosts.contains(snapshot.key)
+                    )
+                    
+                    fetchUserData(for: userId) { username, email, profileImageUrl in
+                        post.username = username
+                        post.email = email
+                        post.profileImageUrl = profileImageUrl
+                        loadedPosts.append(post)
+                        self.posts = loadedPosts
                     }
                 }
             }
         }
+    }
     
     func getPostOwnerId(for postId: String) -> String? {
         posts.first { $0.id == postId }?.userId
@@ -287,8 +287,8 @@ struct ExploreView: View {
             }
         }
     }
-
-
+    
+    
     // Fetch User Data (username, email, profile image URL) using userId
     func fetchUserData(for userId: String, completion: @escaping (String, String, String) -> Void) {
         let userRef = Database.database().reference().child("users").child(userId)
@@ -308,12 +308,12 @@ struct ExploreView: View {
             }
         }
     }
-
+    
     // Toggle Follow/Unfollow and update followers/following in Realtime Database
     func toggleFollow(userId: String) {
         let followingRef = Database.database().reference().child("following").child(currentUserId).child(userId)
         let followersRef = Database.database().reference().child("followers").child(userId).child(currentUserId)
-
+        
         if followingUsers.contains(userId) {
             // Unfollow: Remove user from following and followers
             followingRef.removeValue()
@@ -329,59 +329,59 @@ struct ExploreView: View {
             saveNotification(to: userId, type: "follow")
         }
     }
-
+    
     // Toggle Like
-        func toggleLike(postId: String, postOwnerId: String) {
-            let ref = Database.database().reference()
-            let likeRef = ref.child("likes").child(postId).child(currentUserId)
-            let postRef = ref.child("posts").child(postId)
-            
-            if likedPosts.contains(postId) {
-                // Unlike the post
-                likeRef.removeValue()
-                likedPosts.remove(postId)
-                updateLikeCount(for: postId, increment: false)
-            } else {
-                // Like the post
-                likeRef.setValue(true)
-                likedPosts.insert(postId)
-                saveNotification(to: postOwnerId, type: "like", additionalData: ["postId": postId])
-                updateLikeCount(for: postId, increment: true)
-            }
-            
-            // Toggle the `isLiked` status on the corresponding post in `posts` array
-            if let index = posts.firstIndex(where: { $0.id == postId }) {
-                posts[index].isLiked.toggle()
-            }
+    func toggleLike(postId: String, postOwnerId: String) {
+        let ref = Database.database().reference()
+        let likeRef = ref.child("likes").child(postId).child(currentUserId)
+        let postRef = ref.child("posts").child(postId)
+        
+        if likedPosts.contains(postId) {
+            // Unlike the post
+            likeRef.removeValue()
+            likedPosts.remove(postId)
+            updateLikeCount(for: postId, increment: false)
+        } else {
+            // Like the post
+            likeRef.setValue(true)
+            likedPosts.insert(postId)
+            saveNotification(to: postOwnerId, type: "like", additionalData: ["postId": postId])
+            updateLikeCount(for: postId, increment: true)
         }
-
-        // Update Like Count in Firebase
-        func updateLikeCount(for postId: String, increment: Bool) {
-            let postRef = Database.database().reference().child("posts").child(postId).child("count_like")
-            
-            postRef.runTransactionBlock { currentData in
-                var value = currentData.value as? Int ?? 0
-                value = increment ? value + 1 : max(0, value - 1)
-                currentData.value = value
-                return TransactionResult.success(withValue: currentData)
-            } andCompletionBlock: { error, _, snapshot in
-                if let value = snapshot?.value as? Int {
-                    if let index = self.posts.firstIndex(where: { $0.id == postId }) {
-                        self.posts[index].countLike = value
-                    }
+        
+        // Toggle the `isLiked` status on the corresponding post in `posts` array
+        if let index = posts.firstIndex(where: { $0.id == postId }) {
+            posts[index].isLiked.toggle()
+        }
+    }
+    
+    // Update Like Count in Firebase
+    func updateLikeCount(for postId: String, increment: Bool) {
+        let postRef = Database.database().reference().child("posts").child(postId).child("count_like")
+        
+        postRef.runTransactionBlock { currentData in
+            var value = currentData.value as? Int ?? 0
+            value = increment ? value + 1 : max(0, value - 1)
+            currentData.value = value
+            return TransactionResult.success(withValue: currentData)
+        } andCompletionBlock: { error, _, snapshot in
+            if let value = snapshot?.value as? Int {
+                if let index = self.posts.firstIndex(where: { $0.id == postId }) {
+                    self.posts[index].countLike = value
                 }
             }
         }
-
+    }
+    
     func submitReport() {
         guard let postId = selectedPostID, !reportReason.isEmpty else { return }
         guard let userId = Auth.auth().currentUser?.uid else { return }
-
+        
         guard let postOwnerId = getPostOwnerId(for: postId) else {
             print("Post owner not found")
             return
         }
-
+        
         let reportRef = Database.database().reference().child("reports").child(postId).child(userId)
         reportRef.setValue(reportReason) { error, _ in
             if error == nil {
@@ -394,8 +394,8 @@ struct ExploreView: View {
             }
         }
     }
-
-
+    
+    
     // Send Follow Notification
     func sendFollowNotification(to userId: String) {
         let notificationRef = Database.database().reference().child("notifications").child(userId)
@@ -407,7 +407,7 @@ struct ExploreView: View {
         ]
         notificationRef.child(notificationId).setValue(notificationData)
     }
-
+    
     // Send Like Notification
     func sendLikeNotification(for postId: String) {
         let postRef = Database.database().reference().child("posts").child(postId)
@@ -425,7 +425,7 @@ struct ExploreView: View {
             }
         }
     }
-
+    
     // Increment Like Count
     func incrementLikeCount(for postId: String) {
         let postRef = Database.database().reference().child("posts").child(postId).child("count_like")
@@ -436,7 +436,7 @@ struct ExploreView: View {
             return TransactionResult.success(withValue: currentData)
         }
     }
-
+    
     // Decrement Like Count
     func decrementLikeCount(for postId: String) {
         let postRef = Database.database().reference().child("posts").child(postId).child("count_like")
@@ -457,13 +457,13 @@ struct CommentView: View {
     @State private var comments: [Comment] = []
     @State private var newCommentText: String = ""
     @Environment(\.presentationMode) var presentationMode
-
+    
     var body: some View {
         VStack {
             Text("Comments")
                 .font(.headline)
                 .padding()
-
+            
             // List of Existing Comments
             ScrollView {
                 ForEach(comments) { comment in
@@ -481,7 +481,7 @@ struct CommentView: View {
                 }
             }
             .padding()
-
+            
             // Add New Comment
             HStack {
                 TextField("Add a comment...", text: $newCommentText)
@@ -501,7 +501,7 @@ struct CommentView: View {
         }
         .onAppear(perform: loadComments)
     }
-
+    
     // Load Comments for the Post
     func loadComments() {
         let commentsRef = Database.database().reference().child("comments").child(postId)
@@ -526,7 +526,7 @@ struct CommentView: View {
             self.comments = loadedComments.sorted { $0.timestamp < $1.timestamp }
         }
     }
-
+    
     // Add a New Comment with the User's Actual Username
     func addComment() {
         guard !newCommentText.isEmpty else { return }
@@ -534,12 +534,12 @@ struct CommentView: View {
         
         let commentsRef = Database.database().reference().child("comments").child(postId)
         let commentId = commentsRef.childByAutoId().key ?? UUID().uuidString
-
+        
         // Fetch the user's username from the "users" node
         let userRef = Database.database().reference().child("users").child(userId)
         userRef.observeSingleEvent(of: .value) { snapshot, _ in
             let username = snapshot.childSnapshot(forPath: "username").value as? String ?? "Unknown User"
-
+            
             // Prepare the comment data
             let newCommentData: [String: Any] = [
                 "content": self.newCommentText,
@@ -547,7 +547,7 @@ struct CommentView: View {
                 "userId": userId,
                 "username": username
             ]
-
+            
             // Save the comment data to Firebase
             commentsRef.child(commentId).setValue(newCommentData) { error, _ in
                 if error == nil {
@@ -558,7 +558,7 @@ struct CommentView: View {
             }
         }
     }
-
+    
     // Increment the Comment Count for the Post
     func incrementCommentCount() {
         let postRef = Database.database().reference().child("posts").child(postId).child("count_comment")
@@ -579,13 +579,13 @@ struct CommentView: View {
     func saveNotification(to userId: String, type: String, additionalData: [String: Any] = [:]) {
         let notificationRef = Database.database().reference().child("notifications").child(userId)
         let notificationId = notificationRef.childByAutoId().key ?? UUID().uuidString
-
+        
         var notificationData: [String: Any] = [
             "type": type,
             "userId": userId,
             "timestamp": Date().timeIntervalSince1970
         ]
-
+        
         additionalData.forEach { key, value in
             notificationData[key] = value
         }

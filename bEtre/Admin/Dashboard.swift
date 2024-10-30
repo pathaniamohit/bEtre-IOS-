@@ -7,6 +7,7 @@ struct DashboardView: View {
     @State private var totalReports: Int = 0
     @State private var malePercentage: Double = 0
     @State private var femalePercentage: Double = 0
+    @State private var locationData: [LocationData] = []
     @State private var searchText: String = ""
     @State private var suggestions: [AdminUser] = []
     @State private var showSuggestions: Bool = false
@@ -71,6 +72,7 @@ struct DashboardView: View {
                                 fetchTotalUsers()
                                 fetchTotalReports()
                                 fetchGenderData()
+                                fetchLocationData() // Fetch location data
                             }
                         }
                         
@@ -114,6 +116,16 @@ struct DashboardView: View {
                     GenderPieChart(malePercentage: malePercentage, femalePercentage: femalePercentage)
                         .padding(.top, 20)
                     
+                    // Horizontal Scrollable Location Distribution Chart
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack {
+                            BarChart(title: "Posts by Location", data: locationData, barColor: .orange)
+                                .frame(width: CGFloat(locationData.count * 80)) // Adjust width based on data count
+                        }
+                        .padding(.horizontal, 20) // Margin on left and right
+                    }
+                    .padding(.top, 20)
+                    
                     Spacer()
                 }
             }
@@ -153,6 +165,25 @@ struct DashboardView: View {
         }
     }
     
+    // Fetch post count by location
+    private func fetchLocationData() {
+        databaseRef.child("posts").observeSingleEvent(of: .value) { snapshot in
+            var locationCounts: [String: Int] = [:]
+            
+            for child in snapshot.children {
+                if let childSnapshot = child as? DataSnapshot,
+                   let data = childSnapshot.value as? [String: Any],
+                   let location = data["location"] as? String {
+                    
+                    locationCounts[location, default: 0] += 1
+                }
+            }
+            
+            // Convert to array of LocationData
+            self.locationData = locationCounts.map { LocationData(location: $0.key, count: $0.value) }
+        }
+    }
+    
     private func searchUsers() {
         guard !searchText.isEmpty else {
             self.suggestions = []
@@ -180,6 +211,36 @@ struct DashboardView: View {
     }
 }
 
+// Bar Chart View for Location Data
+struct BarChart: View {
+    var title: String
+    var data: [LocationData]
+    var barColor: Color = .blue
+    
+    var body: some View {
+        VStack(alignment: .leading) {
+            Text(title)
+                .font(.subheadline)
+                .padding(.bottom, 5)
+            
+            Chart(data) {
+                BarMark(
+                    x: .value("Location", $0.location),
+                    y: .value("Count", $0.count)
+                )
+                .foregroundStyle(barColor)
+            }
+            .frame(height: 150)
+        }
+    }
+}
+
+// Location Data Model
+struct LocationData: Identifiable {
+    var id = UUID()
+    var location: String
+    var count: Int
+}
 // Gender Pie Chart View
 struct GenderPieChart: View {
     var malePercentage: Double
