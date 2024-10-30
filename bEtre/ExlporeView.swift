@@ -48,6 +48,7 @@ struct ExploreView: View {
     @State private var currentUserId = Auth.auth().currentUser?.uid ?? ""
     @State private var isCommentSheetPresented: Bool = false
     @State private var selectedPostID: String?
+    @State private var selectedPostCommentCount: Int = 0
 
     var body: some View {
         ScrollView {
@@ -108,11 +109,11 @@ struct ExploreView: View {
 
                         Button(action: {
                             selectedPostID = post.id
+                            selectedPostCommentCount = post.countComment
                             isCommentSheetPresented.toggle()
                         }) {
                             Image(systemName: "message")
                         }
-                        Text("\(post.countComment)")
 
                         Button(action: {
                             reportPost(postId: post.id)
@@ -140,7 +141,7 @@ struct ExploreView: View {
         .onAppear(perform: loadFollowingAndPosts)
         .sheet(isPresented: $isCommentSheetPresented) {
             if let postId = selectedPostID {
-                CommentView(postId: postId)
+                CommentView(postId: postId, commentCount: $selectedPostCommentCount)
             }
         }
     }
@@ -384,66 +385,125 @@ struct ExploreView: View {
 
 struct CommentView: View {
     let postId: String
+    @Binding var commentCount: Int
     @State private var comments: [Comment] = []
     @State private var newCommentText: String = ""
+    @Environment(\.presentationMode) var presentationMode
 
     var body: some View {
         VStack {
-            List(comments) { comment in
-                VStack(alignment: .leading) {
-                    Text(comment.username).font(.headline)
-                    Text(comment.content).font(.body)
-                    Text(Date(timeIntervalSince1970: comment.timestamp), style: .time).font(.caption)
+            Text("Comments")
+                .font(.headline)
+                .padding()
+
+            // List of Existing Comments
+            ScrollView {
+                ForEach(comments) { comment in
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(comment.username)
+                            .font(.headline)
+                            .foregroundColor(.blue)
+                        Text(comment.content)
+                            .font(.body)
+                        Text(Date(timeIntervalSince1970: comment.timestamp), style: .time)
+                            .font(.caption)
+                            .foregroundColor(.gray)
+                    }
+                    .padding(.bottom, 8)
                 }
             }
+            .padding()
 
+            // Add New Comment
             HStack {
                 TextField("Add a comment...", text: $newCommentText)
-                Button("Send") {
-                    addComment()
+                    .textFieldStyle(RoundedBorderTextFieldStyle())
+                    .padding([.leading, .bottom])
+                
+                Button(action: addComment) {
+                    Text("Post")
+                        .font(.headline)
+                        .foregroundColor(.white)
+                        .padding(8)
+                        .background(Color.blue)
+                        .cornerRadius(8)
                 }
-            }.padding()
+                .padding([.trailing, .bottom])
+            }
         }
         .onAppear(perform: loadComments)
     }
 
-    // Load Comments for Post
+    // Load Comments for the Post
     func loadComments() {
         let commentsRef = Database.database().reference().child("comments").child(postId)
         commentsRef.observe(.value) { snapshot in
             var loadedComments: [Comment] = []
+            
             for child in snapshot.children {
                 if let snapshot = child as? DataSnapshot,
-                   let commentDict = snapshot.value as? [String: Any] {
+                   let commentData = snapshot.value as? [String: Any] {
                     let comment = Comment(
                         id: snapshot.key,
-                        content: commentDict["content"] as? String ?? "",
-                        timestamp: commentDict["timestamp"] as? TimeInterval ?? 0,
-                        userId: commentDict["userId"] as? String ?? "",
-                        username: commentDict["username"] as? String ?? ""
+                        content: commentData["content"] as? String ?? "",
+                        timestamp: commentData["timestamp"] as? TimeInterval ?? 0,
+                        userId: commentData["userId"] as? String ?? "",
+                        username: commentData["username"] as? String ?? "Anonymous"
                     )
                     loadedComments.append(comment)
                 }
             }
-            self.comments = loadedComments
+            
+            // Update the comments list
+            self.comments = loadedComments.sorted { $0.timestamp < $1.timestamp }
         }
     }
 
-    // Add New Comment
+    // Add a New Comment with the User's Actual Username
     func addComment() {
         guard !newCommentText.isEmpty else { return }
+        guard let userId = Auth.auth().currentUser?.uid else { return }
+        
         let commentsRef = Database.database().reference().child("comments").child(postId)
         let commentId = commentsRef.childByAutoId().key ?? UUID().uuidString
-        
-        let newComment: [String: Any] = [
-            "content": newCommentText,
-            "timestamp": Date().timeIntervalSince1970,
-            "userId": Auth.auth().currentUser?.uid ?? "",
-            "username": Auth.auth().currentUser?.displayName ?? "Anonymous"
-        ]
-        
-        commentsRef.child(commentId).setValue(newComment)
-        newCommentText = ""
+
+        // Fetch the user's username from the "users" node
+        let userRef = Database.database().reference().child("users").child(userId)
+        userRef.observeSingleEvent(of: .value) { snapshot, _ in
+            let username = snapshot.childSnapshot(forPath: "username").value as? String ?? "Unknown User"
+
+            // Prepare the comment data
+            let newCommentData: [String: Any] = [
+                "content": self.newCommentText,
+                "timestamp": Date().timeIntervalSince1970,
+                "userId": userId,
+                "username": username
+            ]
+
+            // Save the comment data to Firebase
+            commentsRef.child(commentId).setValue(newCommentData) { error, _ in
+                if error == nil {
+                    // Update the comment count in the post node
+                    self.newCommentText = ""
+                }
+            }
+        }
     }
 
+    // Increment the Comment Count for the Post
+    func incrementCommentCount() {
+        let postRef = Database.database().reference().child("posts").child(postId).child("count_comment")
+        
+        postRef.runTransactionBlock { currentData in
+            var count = currentData.value as? Int ?? 0
+            count += 1
+            currentData.value = count
+            return TransactionResult.success(withValue: currentData)
+        } andCompletionBlock: { error, _, snapshot in
+            if let count = snapshot?.value as? Int {
+                // Update the comment count in the parent view
+                self.commentCount = count
+            }
+        }
+    }
 }
