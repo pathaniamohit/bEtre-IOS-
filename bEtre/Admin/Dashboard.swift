@@ -8,6 +8,7 @@ struct DashboardView: View {
     @State private var malePercentage: Double = 0
     @State private var femalePercentage: Double = 0
     @State private var locationData: [LocationData] = []
+    @State private var commentsDisplayData: [CommentDisplayData] = []
     @State private var searchText: String = ""
     @State private var suggestions: [AdminUser] = []
     @State private var showSuggestions: Bool = false
@@ -67,12 +68,13 @@ struct DashboardView: View {
                                 StatsCard(title: "Total Reports", value: totalReports, color: .red)
                             }
                             .padding(.horizontal)
-                            .padding(.top , 20)
+                            .padding(.top, 20)
                             .onAppear {
                                 fetchTotalUsers()
                                 fetchTotalReports()
                                 fetchGenderData()
-                                fetchLocationData() // Fetch location data
+                                fetchLocationData()
+                                fetchCommentsData()
                             }
                         }
                         
@@ -120,11 +122,24 @@ struct DashboardView: View {
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack {
                             BarChart(title: "Posts by Location", data: locationData, barColor: .orange)
-                                .frame(width: CGFloat(locationData.count * 80)) // Adjust width based on data count
+                                .frame(width: CGFloat(locationData.count * 80))
                         }
-                        .padding(.horizontal, 20) // Margin on left and right
+                        .padding(.horizontal, 20)
                     }
                     .padding(.top, 20)
+                    
+                    // Comments Section
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("Recent Comments")
+                            .font(.headline)
+                            .padding(.top, 20)
+                        
+                        ForEach(commentsDisplayData, id: \.id) { commentData in
+                            CommentAdminView(commentData: commentData)
+                                .padding(.horizontal)
+                        }
+                    }
+                    .padding(.horizontal)
                     
                     Spacer()
                 }
@@ -184,6 +199,66 @@ struct DashboardView: View {
         }
     }
     
+    private func fetchCommentsData() {
+        databaseRef.child("posts").observeSingleEvent(of: .value) { postsSnapshot in
+            var postOwnerMapping: [String: String] = [:]
+            var commentsList: [CommentDisplayData] = []
+            
+            // Step 1: Create a mapping of postId to postOwnerId
+            for postChild in postsSnapshot.children {
+                if let postSnapshot = postChild as? DataSnapshot,
+                   let postData = postSnapshot.value as? [String: Any],
+                   let postOwnerId = postData["userId"] as? String {
+                    postOwnerMapping[postSnapshot.key] = postOwnerId
+                }
+            }
+            
+            // Step 2: Fetch comments and map them to the appropriate usernames
+            databaseRef.child("comments").observeSingleEvent(of: .value) { commentsSnapshot in
+                for postCommentChild in commentsSnapshot.children {
+                    if let postSnapshot = postCommentChild as? DataSnapshot {
+                        let postId = postSnapshot.key
+                        guard let postOwnerId = postOwnerMapping[postId] else { continue }
+                        
+                        for commentChild in postSnapshot.children {
+                            if let commentSnapshot = commentChild as? DataSnapshot,
+                               let commentData = commentSnapshot.value as? [String: Any],
+                               let content = commentData["content"] as? String,
+                               let commenterId = commentData["userId"] as? String {
+                                
+                                fetchUsernames(commenterId: commenterId, postOwnerId: postOwnerId) { commenterName, postOwnerName in
+                                    let formattedComment = CommentDisplayData(
+                                        id: commentSnapshot.key,
+                                        commenterName: commenterName,
+                                        content: content,
+                                        postOwnerName: postOwnerName
+                                    )
+                                    commentsList.append(formattedComment)
+                                    self.commentsDisplayData = commentsList
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    // Fetch usernames for both commenter and post owner
+    private func fetchUsernames(commenterId: String, postOwnerId: String, completion: @escaping (String, String) -> Void) {
+        let userRef = databaseRef.child("users")
+        
+        userRef.child(commenterId).observeSingleEvent(of: .value) { commenterSnapshot in
+            let commenterName = (commenterSnapshot.value as? [String: Any])?["username"] as? String ?? "Unknown User"
+            
+            userRef.child(postOwnerId).observeSingleEvent(of: .value) { ownerSnapshot in
+                let postOwnerName = (ownerSnapshot.value as? [String: Any])?["username"] as? String ?? "Unknown User"
+                completion(commenterName, postOwnerName)
+            }
+        }
+    }
+    
+    
     private func searchUsers() {
         guard !searchText.isEmpty else {
             self.suggestions = []
@@ -235,11 +310,41 @@ struct BarChart: View {
     }
 }
 
-// Location Data Model
+// Comment View for Displaying Each Comment Nicely
+struct CommentAdminView: View {
+    var commentData: CommentDisplayData
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Text("\(commentData.commenterName) commented to \(commentData.postOwnerName)")
+                .font(.subheadline)
+                .foregroundColor(.secondary)
+            
+            Text("\"\(commentData.content)\"")
+                .font(.body)
+                .foregroundColor(.primary)
+                .padding(.leading, 10)
+        }
+        .padding(10)
+        .background(Color(.systemGray6))
+        .cornerRadius(8)
+        .shadow(radius: 2)
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+// Model
 struct LocationData: Identifiable {
     var id = UUID()
     var location: String
     var count: Int
+}
+
+struct CommentDisplayData: Identifiable {
+    var id: String
+    var commenterName: String
+    var content: String
+    var postOwnerName: String
 }
 // Gender Pie Chart View
 struct GenderPieChart: View {
