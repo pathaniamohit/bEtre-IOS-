@@ -1,6 +1,5 @@
 import SwiftUI
 import Firebase
-import Firebase
 import FirebaseAuth
 import FirebaseDatabase
 import FirebaseStorage
@@ -20,6 +19,14 @@ struct Post: Identifiable {
     var email: String = ""
     var profileImageUrl: String = ""
     var isLiked: Bool = false
+}
+
+enum NotificationType: String {
+    case follow
+    case unfollow
+    case like
+    case comment
+    case report
 }
 
 struct Comment: Identifiable {
@@ -54,6 +61,11 @@ struct ExploreView: View {
 
     var body: some View {
         ScrollView {
+            Text("Explore")
+                            .font(.largeTitle)
+                            .bold()
+                            .padding(.top, 20) // Add padding for spacing
+                            .padding(.bottom, 10)
             ForEach(posts) { post in
                 VStack(alignment: .leading) {
                     HStack {
@@ -102,7 +114,7 @@ struct ExploreView: View {
                     // Post Actions (Like, Comment, Report)
                     HStack {
                         Button(action: {
-                            toggleLike(postId: post.id)
+                            toggleLike(postId: post.id, postOwnerId: post.userId)
                         }) {
                             Image(systemName: likedPosts.contains(post.id) ? "heart.fill" : "heart")
                                 .foregroundColor(.red)
@@ -150,11 +162,32 @@ struct ExploreView: View {
                     Text("Please specify your reason for reporting this post.")
                 })
         .sheet(isPresented: $isCommentSheetPresented) {
-            if let postId = selectedPostID {
-                CommentView(postId: postId, commentCount: $selectedPostCommentCount)
+            if let postId = selectedPostID, let postOwnerId = getPostOwnerId(for: postId) {
+                CommentView(postId: postId, postOwnerId: postOwnerId, commentCount: $selectedPostCommentCount)
             }
         }
+
     }
+    
+    // Save Notification to Firebase Realtime Database
+    func saveNotification(to userId: String, type: String, additionalData: [String: Any] = [:]) {
+        let notificationRef = Database.database().reference().child("notifications").child(userId)
+        let notificationId = notificationRef.childByAutoId().key ?? UUID().uuidString
+
+        var notificationData: [String: Any] = [
+            "type": type,
+            "userId": currentUserId,
+            "timestamp": Date().timeIntervalSince1970
+        ]
+
+        // Merge additional data for flexibility with other notification types
+        additionalData.forEach { key, value in
+            notificationData[key] = value
+        }
+        
+        notificationRef.child(notificationId).setValue(notificationData)
+    }
+    
     // Load Following Users and Fetch Posts Based on Following Status
         func loadFollowingAndPosts() {
             let followingRef = Database.database().reference().child("following").child(currentUserId)
@@ -216,6 +249,10 @@ struct ExploreView: View {
                 }
             }
         }
+    
+    func getPostOwnerId(for postId: String) -> String? {
+        posts.first { $0.id == postId }?.userId
+    }
     
     // Fetch All Posts Excluding Current User's Posts
     func fetchAllPostsExcludingCurrentUser() {
@@ -283,17 +320,19 @@ struct ExploreView: View {
             followingRef.removeValue()
             followersRef.removeValue()
             followingUsers.remove(userId)
+            saveNotification(to: userId, type: "unfollow")
         } else {
             // Follow: Add user to following and followers
             followingRef.setValue(true)
             followersRef.setValue(true)
             followingUsers.insert(userId)
             sendFollowNotification(to: userId)
+            saveNotification(to: userId, type: "follow")
         }
     }
 
     // Toggle Like
-        func toggleLike(postId: String) {
+        func toggleLike(postId: String, postOwnerId: String) {
             let ref = Database.database().reference()
             let likeRef = ref.child("likes").child(postId).child(currentUserId)
             let postRef = ref.child("posts").child(postId)
@@ -307,6 +346,7 @@ struct ExploreView: View {
                 // Like the post
                 likeRef.setValue(true)
                 likedPosts.insert(postId)
+                saveNotification(to: postOwnerId, type: "like", additionalData: ["postId": postId])
                 updateLikeCount(for: postId, increment: true)
             }
             
@@ -335,21 +375,29 @@ struct ExploreView: View {
         }
 
     func submitReport() {
-            guard let postId = selectedPostID, !reportReason.isEmpty else { return }
-            guard let userId = Auth.auth().currentUser?.uid else { return }
+        guard let postId = selectedPostID, !reportReason.isEmpty else { return }
+        guard let userId = Auth.auth().currentUser?.uid else { return }
 
-            // Database reference to save the report
-            let reportRef = Database.database().reference().child("reports").child(postId).child(userId)
-            reportRef.setValue(reportReason) { error, _ in
-                if error == nil {
-                    // Clear the reason and close the dialog
-                    self.reportReason = ""
-                    self.isReportDialogPresented = false
-                } else {
-                    print("Failed to submit report:", error?.localizedDescription ?? "Unknown error")
-                }
+        // Get postOwnerId from the selected post
+        guard let postOwnerId = getPostOwnerId(for: postId) else {
+            print("Post owner not found")
+            return
+        }
+
+        // Database reference to save the report
+        let reportRef = Database.database().reference().child("reports").child(postId).child(userId)
+        reportRef.setValue(reportReason) { error, _ in
+            if error == nil {
+                // Clear the reason and close the dialog
+                self.reportReason = ""
+                self.isReportDialogPresented = false
+                saveNotification(to: postOwnerId, type: "report", additionalData: ["postId": postId, "reason": reportReason])
+            } else {
+                print("Failed to submit report:", error?.localizedDescription ?? "Unknown error")
             }
         }
+    }
+
 
     // Send Follow Notification
     func sendFollowNotification(to userId: String) {
@@ -402,10 +450,12 @@ struct ExploreView: View {
             return TransactionResult.success(withValue: currentData)
         }
     }
+    
 }
 
 struct CommentView: View {
     let postId: String
+    let postOwnerId: String
     @Binding var commentCount: Int
     @State private var comments: [Comment] = []
     @State private var newCommentText: String = ""
@@ -506,6 +556,7 @@ struct CommentView: View {
                 if error == nil {
                     // Update the comment count in the post node
                     self.newCommentText = ""
+                    saveNotification(to: postOwnerId, type: "comment", additionalData: ["postId": postId, "commentId": commentId])
                 }
             }
         }
@@ -526,5 +577,23 @@ struct CommentView: View {
                 self.commentCount = count
             }
         }
+    }
+    // Save Notification to Firebase Realtime Database
+    func saveNotification(to userId: String, type: String, additionalData: [String: Any] = [:]) {
+        let notificationRef = Database.database().reference().child("notifications").child(userId)
+        let notificationId = notificationRef.childByAutoId().key ?? UUID().uuidString
+
+        var notificationData: [String: Any] = [
+            "type": type,
+            "userId": userId,
+            "timestamp": Date().timeIntervalSince1970
+        ]
+
+        // Merge additional data for flexibility with other notification types
+        additionalData.forEach { key, value in
+            notificationData[key] = value
+        }
+        
+        notificationRef.child(notificationId).setValue(notificationData)
     }
 }
