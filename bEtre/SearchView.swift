@@ -2,7 +2,25 @@ import SwiftUI
 import Firebase
 import FirebaseDatabase
 
-struct User: Identifiable {
+// Updated AppPost struct
+struct AppPost: Identifiable {
+    var id: String
+    var location: String
+    var userId: String
+    var imageUrl: String
+    var content: String
+
+    init(id: String, data: [String: Any]) {
+        self.id = id
+        self.location = data["location"] as? String ?? ""
+        self.userId = data["userId"] as? String ?? ""
+        self.imageUrl = data["imageUrl"] as? String ?? ""
+        self.content = data["content"] as? String ?? ""
+    }
+}
+
+// AppUser struct remains the same
+struct AppUser: Identifiable {
     var id: String
     var username: String
     var profileImageUrl: String
@@ -14,6 +32,7 @@ struct User: Identifiable {
     }
 }
 
+// Supporting structs
 struct UserID: Identifiable {
     var id: String
 }
@@ -30,8 +49,8 @@ enum SuggestionType {
 
 struct SearchView: View {
     @State private var searchText = ""
-    @State private var users: [User] = []
-    @State private var posts: [Post] = []
+    @State private var users: [AppUser] = []
+    @State private var posts: [AppPost] = []
     @State private var suggestions: [Suggestion] = []
     @State private var userIdToUsernameMap: [String: String] = [:]
     @State private var tags: [String] = ["All"]
@@ -55,6 +74,7 @@ struct SearchView: View {
                         }
                     }
 
+                // Tags ScrollView
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack {
                         ForEach(tags, id: \.self) { tag in
@@ -75,6 +95,7 @@ struct SearchView: View {
 
                 Divider().padding(.vertical)
 
+                // Displaying posts
                 ScrollView {
                     LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 15) {
                         ForEach(posts) { post in
@@ -91,6 +112,7 @@ struct SearchView: View {
                                 }
                             }
                             .onTapGesture {
+                                // Add post tap action here
                             }
                         }
                     }
@@ -99,11 +121,12 @@ struct SearchView: View {
                 Spacer()
             }
             .onAppear {
-                fetchAllPosts() // Fetch all posts on view load in the searchview
-                fetchUsers() // Populate userIdToUsernameMap on view load [userId : username]
+                fetchAllPosts()
+                fetchUsers()
                 fetchUniqueLocations()
             }
 
+            // Suggestions View
             if !suggestions.isEmpty {
                 VStack(alignment: .leading) {
                     ForEach(suggestions) { suggestion in
@@ -135,14 +158,15 @@ struct SearchView: View {
             }
         }
         .sheet(item: $selectedUserId) { userId in
-                UserProfileView(userId: userId.id)
+            UserProfileView(userId: userId.id)
         }
     }
 
+    // Fetch users from Firebase
     func fetchUsers() {
         let ref = Database.database().reference().child("users")
         ref.observeSingleEvent(of: .value) { snapshot in
-            var fetchedUsers: [User] = []
+            var fetchedUsers: [AppUser] = []
             var fetchedUsernames: [String: String] = [:]
 
             for child in snapshot.children {
@@ -151,7 +175,7 @@ struct SearchView: View {
                    let username = userData["username"] as? String {
                     let userId = snapshot.key
                     fetchedUsernames[userId] = username.lowercased()
-                    let user = User(id: userId, data: userData)
+                    let user = AppUser(id: userId, data: userData)
                     fetchedUsers.append(user)
                 }
             }
@@ -169,13 +193,13 @@ struct SearchView: View {
     func searchUsers() {
         let ref = Database.database().reference().child("users")
         ref.observeSingleEvent(of: .value) { snapshot in
-            var fetchedUsers: [User] = []
+            var fetchedUsers: [AppUser] = []
             for child in snapshot.children {
                 if let snapshot = child as? DataSnapshot,
                    let userData = snapshot.value as? [String: Any],
                    let username = userData["username"] as? String,
                    username.lowercased().contains(searchText.lowercased()) {
-                    let user = User(id: snapshot.key, data: userData)
+                    let user = AppUser(id: snapshot.key, data: userData)
                     fetchedUsers.append(user)
                 }
             }
@@ -206,39 +230,47 @@ struct SearchView: View {
         }
     }
 
+    // Fetch posts with query
     func fetchPosts(query: String) {
         let ref = Database.database().reference().child("posts")
-        ref.observeSingleEvent(of: .value) { snapshot in
-            var fetchedPosts: [Post] = []
-            for child in snapshot.children {
-                if let snapshot = child as? DataSnapshot,
-                   let postData = snapshot.value as? [String: Any] {
-                    let post = Post(id: snapshot.key, data: postData)
-
+        
+        ref.observeSingleEvent(of: .value) { (snapshot: DataSnapshot) in
+            var fetchedPosts: [AppPost] = []
+            
+            for case let child as DataSnapshot in snapshot.children {
+                if let postData = child.value as? [String: Any] {
+                    let post = AppPost(id: child.key, data: postData)
+                    
                     if query.isEmpty || post.location.lowercased().contains(query.lowercased()) ||
                         (userIdToUsernameMap[post.userId]?.contains(query.lowercased()) ?? false) {
                         fetchedPosts.append(post)
                     }
                 }
             }
+            
             self.posts = fetchedPosts
         }
     }
 
+    // Fetch all posts
     func fetchAllPosts() {
         let ref = Database.database().reference().child("posts")
-        ref.observeSingleEvent(of: .value) { snapshot in
-            var fetchedPosts: [Post] = []
-            for child in snapshot.children {
-                if let snapshot = child as? DataSnapshot, let postData = snapshot.value as? [String: Any] {
-                    let post = Post(id: snapshot.key, data: postData)
+        
+        ref.observeSingleEvent(of: .value) { (snapshot: DataSnapshot) in
+            var fetchedPosts: [AppPost] = []
+            
+            for case let child as DataSnapshot in snapshot.children {
+                if let postData = child.value as? [String: Any] {
+                    let post = AppPost(id: child.key, data: postData)
                     fetchedPosts.append(post)
                 }
             }
+            
             self.posts = fetchedPosts
         }
     }
 
+    // Fetch unique locations
     func fetchUniqueLocations() {
         let ref = Database.database().reference().child("posts")
         ref.observeSingleEvent(of: .value) { snapshot in
@@ -254,13 +286,14 @@ struct SearchView: View {
         }
     }
 
+    // Handle suggestion click
     func handleSuggestionClick(_ suggestion: Suggestion) {
         if suggestion.type == .location {
             searchText = suggestion.text
             fetchPosts(query: suggestion.text)
         } else if suggestion.type == .username {
             if let userId = userIdToUsernameMap.first(where: { $0.value == suggestion.text.lowercased() })?.key {
-                selectedUserId = UserID(id: userId) // Wrap in UserID struct
+                selectedUserId = UserID(id: userId)
             }
         }
         suggestions.removeAll()

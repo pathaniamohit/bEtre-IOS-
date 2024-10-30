@@ -6,7 +6,7 @@ import SDWebImageSwiftUI
 
 struct UserProfileView: View {
     let userId: String // ID of the profile being viewed
-    @State private var posts: [Post] = []
+    @State private var posts: [UserPost] = []
     @State private var profileImageUrl: String = ""
     @State private var username: String = "Loading..."
     @State private var bio: String = "Loading bio..."
@@ -132,11 +132,11 @@ struct UserProfileView: View {
     private func fetchUserPosts() {
         let ref = Database.database().reference().child("posts")
         ref.queryOrdered(byChild: "userId").queryEqual(toValue: userId).observe(.value) { snapshot in
-            var fetchedPosts: [Post] = []
+            var fetchedPosts: [UserPost] = []
             for child in snapshot.children {
                 if let snapshot = child as? DataSnapshot,
                    let postData = snapshot.value as? [String: Any] {
-                    let post = Post(id: snapshot.key, data: postData)
+                    let post = UserPost(id: snapshot.key, data: postData)
                     fetchedPosts.append(post)
                 }
             }

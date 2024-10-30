@@ -11,7 +11,7 @@ import FirebaseDatabase
 import FirebaseAuth
 
 struct EditPostView: View {
-    @State var post: Post
+    @State var post: UserPost
     @Environment(\.dismiss) var dismiss // To close the view after saving
     @State private var isUpdating = false // For showing loading state during save
 
