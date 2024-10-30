@@ -18,12 +18,13 @@ struct AdminPost: Identifiable {
     var username: String = ""
     var email: String = ""
     var profileImageUrl: String = ""
-    var isLiked: Bool = false
     var warningCount: Int = 0
 }
 
 struct ActivityView: View {
     @State private var posts: [AdminPost] = []
+    @State private var selectedPostID: String? = nil // Track selected post ID
+    @State private var isCommentSheetPresented: Bool = false // Track if comment sheet is presented
     @State private var currentUserId = Auth.auth().currentUser?.uid ?? ""
     
     var body: some View {
@@ -72,7 +73,12 @@ struct ActivityView: View {
                             .foregroundColor(.gray)
                         Text("\(post.countLike)")
                         
-                        Image(systemName: "message")
+                        Button(action: {
+                            selectedPostID = post.id
+                            isCommentSheetPresented = true // Show comment sheet
+                        }) {
+                            Image(systemName: "message")
+                        }
                         Text("\(post.countComment)")
                     }
                     .foregroundColor(.gray)
@@ -99,6 +105,11 @@ struct ActivityView: View {
             }
         }
         .onAppear(perform: loadPosts)
+        .sheet(isPresented: $isCommentSheetPresented) {
+            if let postId = selectedPostID {
+                AdminCommentView(postId: postId) // Display AdminCommentView
+            }
+        }
     }
     
     // Load all posts and include warning count data
@@ -170,6 +181,70 @@ struct ActivityView: View {
     }
 }
 
+// Comment View for displaying comments
+struct AdminCommentView: View {
+    let postId: String
+    @State private var comments: [AdminComment] = []
+    
+    var body: some View {
+        VStack {
+            Text("Comments")
+                .font(.headline)
+                .padding()
+            
+            ScrollView {
+                ForEach(comments) { comment in
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(comment.username)
+                            .font(.headline)
+                            .foregroundColor(.blue)
+                        Text(comment.content)
+                            .font(.body)
+                        Text(Date(timeIntervalSince1970: comment.timestamp), style: .time)
+                            .font(.caption)
+                            .foregroundColor(.gray)
+                    }
+                    .padding(.bottom, 8)
+                    .padding(.horizontal)
+                }
+            }
+        }
+        .onAppear(perform: loadComments)
+    }
+    
+    // Load Comments for the Post
+    func loadComments() {
+        let commentsRef = Database.database().reference().child("comments").child(postId)
+        commentsRef.observe(.value) { snapshot in
+            var loadedComments: [AdminComment] = []
+            
+            for child in snapshot.children {
+                if let snapshot = child as? DataSnapshot,
+                   let commentData = snapshot.value as? [String: Any] {
+                    let comment = AdminComment(
+                        id: snapshot.key,
+                        content: commentData["content"] as? String ?? "",
+                        timestamp: commentData["timestamp"] as? TimeInterval ?? 0,
+                        userId: commentData["userId"] as? String ?? "",
+                        username: commentData["username"] as? String ?? "Anonymous"
+                    )
+                    loadedComments.append(comment)
+                }
+            }
+            
+            self.comments = loadedComments.sorted { $0.timestamp < $1.timestamp }
+        }
+    }
+}
+
+// Comment model for displaying comments
+struct AdminComment: Identifiable {
+    var id: String
+    var content: String
+    var timestamp: TimeInterval
+    var userId: String
+    var username: String
+}
 
 struct ActivityView_Previews: PreviewProvider {
     static var previews: some View {
