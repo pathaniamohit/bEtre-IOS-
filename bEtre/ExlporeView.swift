@@ -19,6 +19,7 @@ struct Post: Identifiable {
     var username: String = ""
     var email: String = ""
     var profileImageUrl: String = ""
+    var isLiked: Bool = false
 }
 
 struct Comment: Identifiable {
@@ -143,16 +144,13 @@ struct ExploreView: View {
             }
         }
     }
-
     // Load Following Users and Fetch Posts Based on Following Status
-    func loadFollowingAndPosts() {
-        let followingRef = Database.database().reference().child("following").child(currentUserId)
-        
-        followingRef.observeSingleEvent(of: .value) { snapshot in
-            if snapshot.exists() {
+        func loadFollowingAndPosts() {
+            let followingRef = Database.database().reference().child("following").child(currentUserId)
+            
+            followingRef.observeSingleEvent(of: .value) { snapshot in
                 var followedUsers: Set<String> = []
                 
-                // Collect all followed user IDs
                 for child in snapshot.children {
                     if let childSnapshot = child as? DataSnapshot, childSnapshot.value as? Bool == true {
                         followedUsers.insert(childSnapshot.key)
@@ -169,48 +167,45 @@ struct ExploreView: View {
                     // Fetch posts only from followed users
                     self.fetchPostsFromFollowedUsers()
                 }
-            } else {
-                // No following data, fetch all posts excluding current user's posts
-                self.fetchAllPostsExcludingCurrentUser()
             }
         }
-    }
 
-    // Fetch Posts Only from Followed Users
-    func fetchPostsFromFollowedUsers() {
-        let ref = Database.database().reference().child("posts")
-        ref.observeSingleEvent(of: .value) { snapshot in
-            var loadedPosts: [Post] = []
-            
-            for child in snapshot.children {
-                if let snapshot = child as? DataSnapshot,
-                   let postDict = snapshot.value as? [String: Any],
-                   let userId = postDict["userId"] as? String, followingUsers.contains(userId) {
-                    
-                    var post = Post(
-                        id: snapshot.key,
-                        content: postDict["content"] as? String ?? "",
-                        timestamp: postDict["timestamp"] as? TimeInterval ?? 0,
-                        userId: userId,
-                        location: postDict["location"] as? String ?? "",
-                        imageUrl: postDict["imageUrl"] as? String ?? "",
-                        isReported: postDict["is_reported"] as? Bool ?? false,
-                        countLike: postDict["count_like"] as? Int ?? 0,
-                        countComment: postDict["count_comment"] as? Int ?? 0
-                    )
-                    
-                    fetchUserData(for: userId) { username, email, profileImageUrl in
-                        post.username = username
-                        post.email = email
-                        post.profileImageUrl = profileImageUrl
-                        loadedPosts.append(post)
-                        self.posts = loadedPosts
+        // Fetch Posts Only from Followed Users
+        func fetchPostsFromFollowedUsers() {
+            let ref = Database.database().reference().child("posts")
+            ref.observeSingleEvent(of: .value) { snapshot in
+                var loadedPosts: [Post] = []
+                
+                for child in snapshot.children {
+                    if let snapshot = child as? DataSnapshot,
+                       let postDict = snapshot.value as? [String: Any],
+                       let userId = postDict["userId"] as? String, followingUsers.contains(userId) {
+                        
+                        var post = Post(
+                            id: snapshot.key,
+                            content: postDict["content"] as? String ?? "",
+                            timestamp: postDict["timestamp"] as? TimeInterval ?? 0,
+                            userId: userId,
+                            location: postDict["location"] as? String ?? "",
+                            imageUrl: postDict["imageUrl"] as? String ?? "",
+                            isReported: postDict["is_reported"] as? Bool ?? false,
+                            countLike: postDict["count_like"] as? Int ?? 0,
+                            countComment: postDict["count_comment"] as? Int ?? 0,
+                            isLiked: likedPosts.contains(snapshot.key)
+                        )
+                        
+                        fetchUserData(for: userId) { username, email, profileImageUrl in
+                            post.username = username
+                            post.email = email
+                            post.profileImageUrl = profileImageUrl
+                            loadedPosts.append(post)
+                            self.posts = loadedPosts
+                        }
                     }
                 }
             }
         }
-    }
-
+    
     // Fetch All Posts Excluding Current User's Posts
     func fetchAllPostsExcludingCurrentUser() {
         let ref = Database.database().reference().child("posts")
@@ -287,19 +282,46 @@ struct ExploreView: View {
     }
 
     // Toggle Like
-    func toggleLike(postId: String) {
-        let ref = Database.database().reference().child("likes").child(postId).child(currentUserId)
-        if likedPosts.contains(postId) {
-            ref.removeValue()
-            likedPosts.remove(postId)
-            decrementLikeCount(for: postId)
-        } else {
-            ref.setValue(true)
-            likedPosts.insert(postId)
-            incrementLikeCount(for: postId)
-            sendLikeNotification(for: postId)
+        func toggleLike(postId: String) {
+            let ref = Database.database().reference()
+            let likeRef = ref.child("likes").child(postId).child(currentUserId)
+            let postRef = ref.child("posts").child(postId)
+            
+            if likedPosts.contains(postId) {
+                // Unlike the post
+                likeRef.removeValue()
+                likedPosts.remove(postId)
+                updateLikeCount(for: postId, increment: false)
+            } else {
+                // Like the post
+                likeRef.setValue(true)
+                likedPosts.insert(postId)
+                updateLikeCount(for: postId, increment: true)
+            }
+            
+            // Toggle the `isLiked` status on the corresponding post in `posts` array
+            if let index = posts.firstIndex(where: { $0.id == postId }) {
+                posts[index].isLiked.toggle()
+            }
         }
-    }
+
+        // Update Like Count in Firebase
+        func updateLikeCount(for postId: String, increment: Bool) {
+            let postRef = Database.database().reference().child("posts").child(postId).child("count_like")
+            
+            postRef.runTransactionBlock { currentData in
+                var value = currentData.value as? Int ?? 0
+                value = increment ? value + 1 : max(0, value - 1)
+                currentData.value = value
+                return TransactionResult.success(withValue: currentData)
+            } andCompletionBlock: { error, _, snapshot in
+                if let value = snapshot?.value as? Int {
+                    if let index = self.posts.firstIndex(where: { $0.id == postId }) {
+                        self.posts[index].countLike = value
+                    }
+                }
+            }
+        }
 
     // Report Post
     func reportPost(postId: String) {
