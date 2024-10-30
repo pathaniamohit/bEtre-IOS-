@@ -49,6 +49,8 @@ struct ExploreView: View {
     @State private var isCommentSheetPresented: Bool = false
     @State private var selectedPostID: String?
     @State private var selectedPostCommentCount: Int = 0
+    @State private var isReportDialogPresented: Bool = false
+    @State private var reportReason: String = ""
 
     var body: some View {
         ScrollView {
@@ -116,10 +118,11 @@ struct ExploreView: View {
                         }
 
                         Button(action: {
-                            reportPost(postId: post.id)
-                        }) {
+                            selectedPostID = post.id
+                            isReportDialogPresented = true
+                                        }) {
                             Image(systemName: "exclamationmark.triangle")
-                                .foregroundColor(.orange)
+                            .foregroundColor(.orange)
                         }
                     }
 
@@ -139,6 +142,13 @@ struct ExploreView: View {
             }
         }
         .onAppear(perform: loadFollowingAndPosts)
+        .alert("Report Post", isPresented: $isReportDialogPresented, actions: {
+                    TextField("Reason for reporting...", text: $reportReason)
+                    Button("Submit", action: submitReport)
+                    Button("Cancel", role: .cancel, action: { isReportDialogPresented = false })
+                }, message: {
+                    Text("Please specify your reason for reporting this post.")
+                })
         .sheet(isPresented: $isCommentSheetPresented) {
             if let postId = selectedPostID {
                 CommentView(postId: postId, commentCount: $selectedPostCommentCount)
@@ -324,11 +334,22 @@ struct ExploreView: View {
             }
         }
 
-    // Report Post
-    func reportPost(postId: String) {
-        let ref = Database.database().reference().child("reports").child(postId).child(currentUserId)
-        ref.setValue("Inappropriate content")
-    }
+    func submitReport() {
+            guard let postId = selectedPostID, !reportReason.isEmpty else { return }
+            guard let userId = Auth.auth().currentUser?.uid else { return }
+
+            // Database reference to save the report
+            let reportRef = Database.database().reference().child("reports").child(postId).child(userId)
+            reportRef.setValue(reportReason) { error, _ in
+                if error == nil {
+                    // Clear the reason and close the dialog
+                    self.reportReason = ""
+                    self.isReportDialogPresented = false
+                } else {
+                    print("Failed to submit report:", error?.localizedDescription ?? "Unknown error")
+                }
+            }
+        }
 
     // Send Follow Notification
     func sendFollowNotification(to userId: String) {
