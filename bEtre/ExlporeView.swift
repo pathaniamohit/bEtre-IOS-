@@ -196,14 +196,20 @@ struct ExploreView: View {
         }
     }
 
-    // Toggle Follow/Unfollow
+    // Toggle Follow/Unfollow and update followers/following in Realtime Database
     func toggleFollow(userId: String) {
-        let ref = Database.database().reference().child("following").child(currentUserId).child(userId)
+        let followingRef = Database.database().reference().child("following").child(currentUserId).child(userId)
+        let followersRef = Database.database().reference().child("followers").child(userId).child(currentUserId)
+
         if followingUsers.contains(userId) {
-            ref.removeValue()
+            // Unfollow: Remove user from following and followers
+            followingRef.removeValue()
+            followersRef.removeValue()
             followingUsers.remove(userId)
         } else {
-            ref.setValue(true)
+            // Follow: Add user to following and followers
+            followingRef.setValue(true)
+            followersRef.setValue(true)
             followingUsers.insert(userId)
             sendFollowNotification(to: userId)
         }
