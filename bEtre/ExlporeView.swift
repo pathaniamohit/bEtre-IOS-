@@ -452,55 +452,74 @@ struct ExploreView: View {
 
 struct CommentView: View {
     let postId: String
-    let postOwnerId: String
-    @Binding var commentCount: Int
-    @State private var comments: [Comment] = []
-    @State private var newCommentText: String = ""
-    @Environment(\.presentationMode) var presentationMode
-    
-    var body: some View {
-        VStack {
-            Text("Comments")
-                .font(.headline)
-                .padding()
-            
-            // List of Existing Comments
-            ScrollView {
-                ForEach(comments) { comment in
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(comment.username)
-                            .font(.headline)
-                            .foregroundColor(.blue)
-                        Text(comment.content)
-                            .font(.body)
-                        Text(Date(timeIntervalSince1970: comment.timestamp), style: .time)
-                            .font(.caption)
-                            .foregroundColor(.gray)
-                    }
-                    .padding(.bottom, 8)
-                }
-            }
-            .padding()
-            
-            // Add New Comment
-            HStack {
-                TextField("Add a comment...", text: $newCommentText)
-                    .textFieldStyle(RoundedBorderTextFieldStyle())
-                    .padding([.leading, .bottom])
+        let postOwnerId: String
+        @Binding var commentCount: Int
+        @State private var comments: [Comment] = []
+        @State private var newCommentText: String = ""
+        @State private var isReportDialogPresented: Bool = false
+        @State private var reportReason: String = ""
+        @State private var selectedCommentId: String?
+
+        var body: some View {
+            VStack {
+                Text("Comments")
+                    .font(.headline)
+                    .padding()
                 
-                Button(action: addComment) {
-                    Text("Post")
-                        .font(.headline)
-                        .foregroundColor(.white)
-                        .padding(8)
-                        .background(Color.blue)
-                        .cornerRadius(8)
+                ScrollView {
+                    ForEach(comments) { comment in
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(comment.username)
+                                .font(.headline)
+                                .foregroundColor(.blue)
+                            Text(comment.content)
+                                .font(.body)
+                            Text(Date(timeIntervalSince1970: comment.timestamp), style: .time)
+                                .font(.caption)
+                                .foregroundColor(.gray)
+                            
+                            // Report Button
+                            Button(action: {
+                                selectedCommentId = comment.id
+                                isReportDialogPresented = true
+                            }) {
+                                Text("Report")
+                                    .foregroundColor(.red)
+                                    .font(.caption)
+                            }
+                            .padding(.top, 4)
+                        }
+                        .padding(.bottom, 8)
+                    }
                 }
-                .padding([.trailing, .bottom])
+                .padding()
+                
+                // Add Comment Section (Optional, depending on admin or user)
+                HStack {
+                    TextField("Add a comment...", text: $newCommentText)
+                        .textFieldStyle(RoundedBorderTextFieldStyle())
+                        .padding([.leading, .bottom])
+                    
+                    Button(action: addComment) {
+                        Text("Post")
+                            .font(.headline)
+                            .foregroundColor(.white)
+                            .padding(8)
+                            .background(Color.blue)
+                            .cornerRadius(8)
+                    }
+                    .padding([.trailing, .bottom])
+                }
             }
+            .onAppear(perform: loadComments)
+            .alert("Report Comment", isPresented: $isReportDialogPresented, actions: {
+                TextField("Reason for reporting...", text: $reportReason)
+                Button("Submit", action: submitCommentReport)
+                Button("Cancel", role: .cancel, action: { isReportDialogPresented = false })
+            }, message: {
+                Text("Please specify your reason for reporting this comment.")
+            })
         }
-        .onAppear(perform: loadComments)
-    }
     
     // Load Comments for the Post
     func loadComments() {
@@ -592,4 +611,33 @@ struct CommentView: View {
         
         notificationRef.child(notificationId).setValue(notificationData)
     }
+    
+    // Submit report for inappropriate comment
+       func submitCommentReport() {
+           guard let commentId = selectedCommentId else { return }
+           guard let reporterId = Auth.auth().currentUser?.uid else { return }
+           
+           // Report the comment in the Firebase Database
+           let reportRef = Database.database().reference().child("reports").child("comments").child(commentId).childByAutoId()
+           
+           let reportData: [String: Any] = [
+               "reporterId": reporterId,
+               "reportedCommentUserId": postOwnerId, // Use postOwnerId or comment's userId if available
+               "postId": postId,
+               "timestamp": Date().timeIntervalSince1970,
+               "reason": reportReason,
+               "status": "pending"
+           ]
+           
+           reportRef.setValue(reportData) { error, _ in
+               if error == nil {
+                   // Reset and close dialog
+                   reportReason = ""
+                   isReportDialogPresented = false
+                   print("Comment reported successfully.")
+               } else {
+                   print("Failed to report comment:", error?.localizedDescription ?? "Unknown error")
+               }
+           }
+       }
 }
