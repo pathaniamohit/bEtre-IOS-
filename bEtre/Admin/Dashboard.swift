@@ -156,7 +156,7 @@ struct DashboardView: View {
                 }
             }
             .navigationDestination(for: String.self) { userId in
-                UserProfileView(userId: userId)
+                AdminEditUser(userId: userId)
             }
         }
     }
