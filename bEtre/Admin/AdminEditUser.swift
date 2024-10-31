@@ -209,27 +209,28 @@ struct AdminEditUser: View {
         guard let imageData = selectedImage.jpegData(compressionQuality: 0.8) else { return }
 
         let storagePath = "users/\(userId)/profile.jpg"
-        let storageRef = storageRef.child(storagePath)
+        let storageRef = Storage.storage().reference().child(storagePath)
 
-        storageRef.putData(imageData, metadata: nil) { _, error in
+        storageRef.putData(imageData, metadata: nil) { metadata, error in
             if let error = error {
                 print("Failed to upload image: \(error.localizedDescription)")
                 return
             }
-            
+
             storageRef.downloadURL { url, error in
                 if let error = error {
                     print("Failed to get download URL: \(error.localizedDescription)")
                     return
                 }
-                
+
                 if let url = url {
                     self.profileImageUrl = url.absoluteString
-                    updateProfileImageUrlInDatabase(url.absoluteString)
+                    self.updateProfileImageUrlInDatabase(url.absoluteString)
                 }
             }
         }
     }
+
     
     private func updateProfileImageUrlInDatabase(_ url: String) {
         let ref = databaseRef.child("users").child(userId).child("profileImageUrl")
