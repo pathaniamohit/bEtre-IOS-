@@ -64,9 +64,11 @@ struct DashboardView: View {
                             
                             // Stats Cards
                             HStack(spacing: 20) {
-                                StatsCard(title: "Total Users", value: totalUsers, color: .blue)
-                                StatsCard(title: "Total Reports", value: totalReports, color: .red)
-                            }
+                                                    NavigationLink(destination: AllUsersView()) {
+                                                        StatsCard(title: "Total Users", value: totalUsers, color: .blue)
+                                                    }
+                                                    StatsCard(title: "Total Reports", value: totalReports, color: .red)
+                                                }
                             .padding(.horizontal)
                             .padding(.top, 20)
                             .onAppear {
