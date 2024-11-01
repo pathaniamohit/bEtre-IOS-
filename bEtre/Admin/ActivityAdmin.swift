@@ -104,14 +104,14 @@ struct ActivityView: View {
                             Spacer()
                             
                             // Delete Post Button
-                                                    Button(action: {
-                                                        postToDelete = post
-                                                        showDeletePostDialog = true
-                                                    }) {
-                                                        Image(systemName: "trash")
-                                                            .foregroundColor(.red)
-                                                    }
-                                                    .padding(.trailing, 10)
+                            Button(action: {
+                                postToDelete = post
+                                showDeletePostDialog = true
+                            }) {
+                                Image(systemName: "trash")
+                                    .foregroundColor(.red)
+                            }
+                            .padding(.trailing, 10)
                         }
                         
                         if let url = URL(string: post.imageUrl) {
@@ -154,7 +154,7 @@ struct ActivityView: View {
                             .shadow(radius: 5)
                             .overlay(
                                 RoundedRectangle(cornerRadius: 10)
-                                    .stroke(getBorderColor(for: post.warningCount), lineWidth: 5)
+                                    .stroke(post.isReported ? Color.red : Color.clear, lineWidth: 5)
                             )
                     )
                     .padding(.horizontal)
@@ -163,44 +163,44 @@ struct ActivityView: View {
             }
             .onAppear(perform: loadPosts)
             .sheet(isPresented: $isCommentSheetPresented) {
-                        if let postId = selectedPostID {
-                            AdminCommentView(postId: postId, onDeleteComment: deleteComment)
-                        }
-                    }
-                    .alert(isPresented: $showDeletePostDialog) {
-                        Alert(
-                            title: Text("Delete Post"),
-                            message: Text("Are you sure you want to delete this post?"),
-                            primaryButton: .destructive(Text("Delete"), action: deletePost),
-                            secondaryButton: .cancel()
-                        )
-                    }
+                if let postId = selectedPostID {
+                    AdminCommentView(postId: postId, onDeleteComment: deleteComment)
+                }
+            }
+            .alert(isPresented: $showDeletePostDialog) {
+                Alert(
+                    title: Text("Delete Post"),
+                    message: Text("Are you sure you want to delete this post?"),
+                    primaryButton: .destructive(Text("Delete"), action: deletePost),
+                    secondaryButton: .cancel()
+                )
+            }
         }
     }
     
     private func deletePost() {
-            guard let post = postToDelete else { return }
-            let ref = Database.database().reference().child("posts").child(post.id)
-            ref.removeValue { error, _ in
-                if let error = error {
-                    print("Failed to delete post: \(error.localizedDescription)")
-                } else {
-                    self.posts.removeAll { $0.id == post.id }
-                }
-                postToDelete = nil
+        guard let post = postToDelete else { return }
+        let ref = Database.database().reference().child("posts").child(post.id)
+        ref.removeValue { error, _ in
+            if let error = error {
+                print("Failed to delete post: \(error.localizedDescription)")
+            } else {
+                self.posts.removeAll { $0.id == post.id }
+            }
+            postToDelete = nil
+        }
+    }
+    
+    private func deleteComment(_ comment: AdminComment, postId: String) {
+        let ref = Database.database().reference().child("comments").child(postId).child(comment.id)
+        ref.removeValue { error, _ in
+            if let error = error {
+                print("Failed to delete comment: \(error.localizedDescription)")
+            } else {
+                // Reload comments or update comments list to reflect deletion
             }
         }
-        
-        private func deleteComment(_ comment: AdminComment, postId: String) {
-            let ref = Database.database().reference().child("comments").child(postId).child(comment.id)
-            ref.removeValue { error, _ in
-                if let error = error {
-                    print("Failed to delete comment: \(error.localizedDescription)")
-                } else {
-                    // Reload comments or update comments list to reflect deletion
-                }
-            }
-        }
+    }
     
     // Load all posts and prepare initial filtered list
     private func loadPosts() {
@@ -311,44 +311,49 @@ struct AdminCommentView: View {
                 .padding()
             
             ScrollView {
-                            ForEach(comments) { comment in
-                                HStack(alignment: .top, spacing: 10) {
-                                    VStack(alignment: .leading, spacing: 4) {
-                                        Text(comment.username)
-                                            .font(.headline)
-                                            .foregroundColor(.blue)
-                                        Text(comment.content)
-                                            .font(.body)
-                                        Text(Date(timeIntervalSince1970: comment.timestamp), style: .time)
-                                            .font(.caption)
-                                            .foregroundColor(.gray)
-                                    }
-                                    
-                                    Spacer()
-                                    
-                                    // Delete Comment Button
-                                    Button(action: {
-                                        commentToDelete = comment
-                                        showDeleteCommentDialog = true
-                                    }) {
-                                        Image(systemName: "trash")
-                                            .foregroundColor(.red)
-                                    }
-                                }
-                                .padding(.bottom, 8)
-                                .padding(.horizontal)
+                ForEach(comments) { comment in
+                    HStack(alignment: .top, spacing: 10) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(comment.username)
+                                .font(.headline)
+                                .foregroundColor(.blue)
+                            Text(comment.content)
+                                .font(.body)
+                            Text(Date(timeIntervalSince1970: comment.timestamp), style: .time)
+                                .font(.caption)
+                                .foregroundColor(.gray)
+                        }
+                        
+                        Spacer()
+                        
+                        // Delete Comment Button
+                        Button(action: {
+                            commentToDelete = comment
+                            showDeleteCommentDialog = true
+                        }) {
+                            Image(systemName: "trash")
+                                .foregroundColor(.red)
+                        }
+                    }
+                    .padding(.bottom, 8)
+                    .padding(.horizontal)
+                    // Apply red border for reported comments
+                    .background(
+                        RoundedRectangle(cornerRadius: 10)
+                            .stroke(comment.userId == postId ? Color.red : Color.clear, lineWidth: 5)
+                    )
                 }
             }
         }
         .onAppear(perform: loadComments)
         .alert(isPresented: $showDeleteCommentDialog) {
-                    Alert(
-                        title: Text("Delete Comment"),
-                        message: Text("Are you sure you want to delete this comment?"),
-                        primaryButton: .destructive(Text("Delete"), action: confirmDeleteComment),
-                        secondaryButton: .cancel()
-                    )
-                }
+            Alert(
+                title: Text("Delete Comment"),
+                message: Text("Are you sure you want to delete this comment?"),
+                primaryButton: .destructive(Text("Delete"), action: confirmDeleteComment),
+                secondaryButton: .cancel()
+            )
+        }
     }
     
     // Load Comments for the Post
@@ -375,11 +380,11 @@ struct AdminCommentView: View {
         }
     }
     private func confirmDeleteComment() {
-            if let comment = commentToDelete {
-                onDeleteComment?(comment, postId)
-                commentToDelete = nil
-            }
+        if let comment = commentToDelete {
+            onDeleteComment?(comment, postId)
+            commentToDelete = nil
         }
+    }
 }
 
 // Comment model for displaying comments
