@@ -30,6 +30,9 @@ struct ActivityView: View {
     @State private var isCommentSheetPresented: Bool = false // Track if comment sheet is presented
     @State private var currentUserId = Auth.auth().currentUser?.uid ?? ""
     @State private var searchText: String = "" // Search text for location
+    @State private var showDeletePostDialog: Bool = false
+    @State private var postToDelete: AdminPost? = nil
+    @State private var commentToDelete: AdminComment? = nil
     
     var body: some View {
         VStack {
@@ -99,6 +102,16 @@ struct ActivityView: View {
                                     .foregroundColor(.gray)
                             }
                             Spacer()
+                            
+                            // Delete Post Button
+                                                    Button(action: {
+                                                        postToDelete = post
+                                                        showDeletePostDialog = true
+                                                    }) {
+                                                        Image(systemName: "trash")
+                                                            .foregroundColor(.red)
+                                                    }
+                                                    .padding(.trailing, 10)
                         }
                         
                         if let url = URL(string: post.imageUrl) {
@@ -150,12 +163,44 @@ struct ActivityView: View {
             }
             .onAppear(perform: loadPosts)
             .sheet(isPresented: $isCommentSheetPresented) {
-                if let postId = selectedPostID {
-                    AdminCommentView(postId: postId)
+                        if let postId = selectedPostID {
+                            AdminCommentView(postId: postId, onDeleteComment: deleteComment)
+                        }
+                    }
+                    .alert(isPresented: $showDeletePostDialog) {
+                        Alert(
+                            title: Text("Delete Post"),
+                            message: Text("Are you sure you want to delete this post?"),
+                            primaryButton: .destructive(Text("Delete"), action: deletePost),
+                            secondaryButton: .cancel()
+                        )
+                    }
+        }
+    }
+    
+    private func deletePost() {
+            guard let post = postToDelete else { return }
+            let ref = Database.database().reference().child("posts").child(post.id)
+            ref.removeValue { error, _ in
+                if let error = error {
+                    print("Failed to delete post: \(error.localizedDescription)")
+                } else {
+                    self.posts.removeAll { $0.id == post.id }
+                }
+                postToDelete = nil
+            }
+        }
+        
+        private func deleteComment(_ comment: AdminComment, postId: String) {
+            let ref = Database.database().reference().child("comments").child(postId).child(comment.id)
+            ref.removeValue { error, _ in
+                if let error = error {
+                    print("Failed to delete comment: \(error.localizedDescription)")
+                } else {
+                    // Reload comments or update comments list to reflect deletion
                 }
             }
         }
-    }
     
     // Load all posts and prepare initial filtered list
     private func loadPosts() {
@@ -255,6 +300,9 @@ struct ActivityView: View {
 struct AdminCommentView: View {
     let postId: String
     @State private var comments: [AdminComment] = []
+    var onDeleteComment: ((AdminComment, String) -> Void)?
+    @State private var showDeleteCommentDialog: Bool = false
+    @State private var commentToDelete: AdminComment? = nil
     
     var body: some View {
         VStack {
@@ -263,23 +311,44 @@ struct AdminCommentView: View {
                 .padding()
             
             ScrollView {
-                ForEach(comments) { comment in
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(comment.username)
-                            .font(.headline)
-                            .foregroundColor(.blue)
-                        Text(comment.content)
-                            .font(.body)
-                        Text(Date(timeIntervalSince1970: comment.timestamp), style: .time)
-                            .font(.caption)
-                            .foregroundColor(.gray)
-                    }
-                    .padding(.bottom, 8)
-                    .padding(.horizontal)
+                            ForEach(comments) { comment in
+                                HStack(alignment: .top, spacing: 10) {
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text(comment.username)
+                                            .font(.headline)
+                                            .foregroundColor(.blue)
+                                        Text(comment.content)
+                                            .font(.body)
+                                        Text(Date(timeIntervalSince1970: comment.timestamp), style: .time)
+                                            .font(.caption)
+                                            .foregroundColor(.gray)
+                                    }
+                                    
+                                    Spacer()
+                                    
+                                    // Delete Comment Button
+                                    Button(action: {
+                                        commentToDelete = comment
+                                        showDeleteCommentDialog = true
+                                    }) {
+                                        Image(systemName: "trash")
+                                            .foregroundColor(.red)
+                                    }
+                                }
+                                .padding(.bottom, 8)
+                                .padding(.horizontal)
                 }
             }
         }
         .onAppear(perform: loadComments)
+        .alert(isPresented: $showDeleteCommentDialog) {
+                    Alert(
+                        title: Text("Delete Comment"),
+                        message: Text("Are you sure you want to delete this comment?"),
+                        primaryButton: .destructive(Text("Delete"), action: confirmDeleteComment),
+                        secondaryButton: .cancel()
+                    )
+                }
     }
     
     // Load Comments for the Post
@@ -305,6 +374,12 @@ struct AdminCommentView: View {
             self.comments = loadedComments.sorted { $0.timestamp < $1.timestamp }
         }
     }
+    private func confirmDeleteComment() {
+            if let comment = commentToDelete {
+                onDeleteComment?(comment, postId)
+                commentToDelete = nil
+            }
+        }
 }
 
 // Comment model for displaying comments
