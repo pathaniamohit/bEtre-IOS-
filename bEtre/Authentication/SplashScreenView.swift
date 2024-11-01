@@ -60,7 +60,7 @@ struct SplashScreenView: View {
     private func checkUserRole(userId: String) {
         databaseRef.child("users").child(userId).child("role").observeSingleEvent(of: .value) { snapshot in
             if let role = snapshot.value as? String {
-                if role == "admin" {
+                if role == "admin" || role == "moderator" {
                     self.shouldNavigateToAdmin = true
                 } else {
                     self.shouldNavigateToMaison = true

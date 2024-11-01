@@ -1,10 +1,13 @@
 import SwiftUI
 import FirebaseDatabase
 import Charts
+import FirebaseAuth
 
 struct DashboardView: View {
     @State private var totalUsers: Int = 0
     @State private var totalReports: Int = 0
+    @State private var totalReportedUsers: Int = 0
+    @State private var totalModerators: Int = 0
     @State private var malePercentage: Double = 0
     @State private var femalePercentage: Double = 0
     @State private var locationData: [LocationData] = []
@@ -14,6 +17,7 @@ struct DashboardView: View {
     @State private var showSuggestions: Bool = false
     @State private var selectedUserId: String?
     @State private var navigationPath = NavigationPath()
+    @State private var isAdmin = false
     
     private let databaseRef = Database.database().reference()
     
@@ -63,15 +67,31 @@ struct DashboardView: View {
                             .padding([.leading, .trailing], 20)
                             
                             // Stats Cards
-                            HStack(spacing: 20) {
-                                StatsCard(title: "Total Users", value: totalUsers, color: .blue)
-                                StatsCard(title: "Total Reports", value: totalReports, color: .red)
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                HStack(spacing: 20) {
+                                    NavigationLink(destination: AllUsersView()) {
+                                        StatsCard(title: "Total Users", value: totalUsers, color: .blue)
+                                    }
+                                    NavigationLink(destination: ReportedUsersView()) {
+                                        StatsCard(title: "Reported Users", value: totalReportedUsers, color: .orange)
+                                    }
+                                    if isAdmin {
+                                        NavigationLink(destination: ViewModerator()) {
+                                            StatsCard(title: "Moderators", value: totalModerators, color: .purple)
+                                        }
+                                    }
+                                }
+                                .padding(.bottom, 20)
+                                
                             }
                             .padding(.horizontal)
                             .padding(.top, 20)
                             .onAppear {
+                                checkAdminStatus()
                                 fetchTotalUsers()
                                 fetchTotalReports()
+                                fetchTotalReportedUsers()
+                                fetchTotalModerators()
                                 fetchGenderData()
                                 fetchLocationData()
                                 fetchCommentsData()
@@ -145,7 +165,7 @@ struct DashboardView: View {
                 }
             }
             .navigationDestination(for: String.self) { userId in
-                UserProfileView(userId: userId)
+                AdminEditUser(userId: userId)
             }
         }
     }
@@ -161,6 +181,93 @@ struct DashboardView: View {
             self.totalReports = Int(snapshot.childrenCount)
         }
     }
+    
+    private func fetchTotalReportedUsers() {
+        var uniqueReportedUserIds = Set<String>()
+        
+        // Fetch unique reported users from the "reports" node
+        databaseRef.child("reports").observeSingleEvent(of: .value) { snapshot in
+            for postSnapshot in snapshot.children {
+                if let postSnapshot = postSnapshot as? DataSnapshot {
+                    for userSnapshot in postSnapshot.children {
+                        if let userSnapshot = userSnapshot as? DataSnapshot {
+                            uniqueReportedUserIds.insert(userSnapshot.key)
+                        }
+                    }
+                }
+            }
+            
+            // Fetch reported users from the "comments" node
+            databaseRef.child("comments").observeSingleEvent(of: .value) { commentsSnapshot in
+                for postSnapshot in commentsSnapshot.children {
+                    if let postSnapshot = postSnapshot as? DataSnapshot {
+                        for commentSnapshot in postSnapshot.children {
+                            if let commentData = (commentSnapshot as? DataSnapshot)?.value as? [String: Any],
+                               let reportedUserId = commentData["reportedCommentUserId"] as? String {
+                                uniqueReportedUserIds.insert(reportedUserId)
+                            }
+                        }
+                    }
+                }
+                
+                // Confirm each ID in uniqueReportedUserIds with the "users" node
+                self.validateUserIds(Array(uniqueReportedUserIds))
+            }
+        }
+    }
+    
+    private func checkAdminStatus() {
+            guard let currentUser = Auth.auth().currentUser else { return }
+            databaseRef.child("users").child(currentUser.uid).observeSingleEvent(of: .value) { snapshot in
+                if let data = snapshot.value as? [String: Any],
+                   let role = data["role"] as? String {
+                    isAdmin = (role == "admin")
+                }
+            }
+        }
+        
+        private func fetchTotalModerators() {
+            databaseRef.child("users").observeSingleEvent(of: .value) { snapshot in
+                var moderatorCount = 0
+                for child in snapshot.children {
+                    if let snapshot = child as? DataSnapshot,
+                       let userData = snapshot.value as? [String: Any],
+                       let role = userData["role"] as? String,
+                       role == "moderator" {
+                        moderatorCount += 1
+                    }
+                }
+                self.totalModerators = moderatorCount
+            }
+        }
+    
+    // Helper function to validate user IDs
+    private func validateUserIds(_ reportedUserIds: [String]) {
+        var validUserIds = Set<String>()
+        let userRef = databaseRef.child("users")
+        
+        let dispatchGroup = DispatchGroup()
+        
+        for userId in reportedUserIds {
+            dispatchGroup.enter()
+            userRef.child(userId).observeSingleEvent(of: .value) { snapshot in
+                if snapshot.exists() {
+                    validUserIds.insert(userId)
+                    print("Confirmed valid user ID: \(userId)")
+                } else {
+                    print("Invalid user ID, not found in 'users' node: \(userId)")
+                }
+                dispatchGroup.leave()
+            }
+        }
+        
+        // Update the count after all checks are completed
+        dispatchGroup.notify(queue: .main) {
+            self.totalReportedUsers = validUserIds.count
+            print("Total valid reported users count: \(self.totalReportedUsers)")
+        }
+    }
+    
     
     private func fetchGenderData() {
         databaseRef.child("users").observeSingleEvent(of: .value) { snapshot in

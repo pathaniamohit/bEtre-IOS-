@@ -174,7 +174,7 @@ struct LoginView: View {
     }
     
     private func navigateBasedOnRole(role: String) {
-        if role == "admin" {
+        if role == "admin" || role == "moderator"  {
             navigateToAdminView = true
         } else if role == "user" {
             navigateToMaisonView = true
