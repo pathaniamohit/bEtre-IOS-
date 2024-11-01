@@ -23,100 +23,146 @@ struct AdminPost: Identifiable {
 
 struct ActivityView: View {
     @State private var posts: [AdminPost] = []
+    @State private var filteredPosts: [AdminPost] = []  // Filtered posts based on search
+    @State private var uniqueLocations: [String] = [] // List of unique post locations for suggestions
+    @State private var filteredLocations: [String] = [] // Filtered location suggestions
     @State private var selectedPostID: String? = nil // Track selected post ID
     @State private var isCommentSheetPresented: Bool = false // Track if comment sheet is presented
     @State private var currentUserId = Auth.auth().currentUser?.uid ?? ""
+    @State private var searchText: String = "" // Search text for location
     
     var body: some View {
-        ScrollView {
-            Text("Activity")
-                .font(.largeTitle)
-                .bold()
-                .padding(.top, 20)
-                .padding(.bottom, 10)
+        VStack {
+            // Search bar with suggestions for filtering posts by location
+            VStack {
+                HStack {
+                    TextField("Search by location", text: $searchText)
+                        .padding(10)
+                        .background(Color(.systemGray6))
+                        .cornerRadius(8)
+                        .onChange(of: searchText) { _ in
+                            applyLocationFilter() // Filter posts each time the search text changes
+                            updateLocationSuggestions() // Update location suggestions
+                        }
+                    
+                    Button("Search") {
+                        applyLocationFilter() // Trigger search when button is pressed
+                    }
+                    .padding(.leading, 10)
+                }
+                .padding(.horizontal)
+                .padding(.top)
+                
+                // Display location suggestions when searchText is non-empty
+                if !filteredLocations.isEmpty {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack {
+                            ForEach(filteredLocations, id: \.self) { location in
+                                Button(action: {
+                                    searchText = location // Set searchText to selected location
+                                    applyLocationFilter() // Filter posts immediately
+                                }) {
+                                    Text(location)
+                                        .padding(8)
+                                        .background(Color(.systemGray5))
+                                        .cornerRadius(5)
+                                }
+                            }
+                        }
+                        .padding(.horizontal)
+                    }
+                    .padding(.bottom, 10)
+                }
+            }
             
-            ForEach(posts) { post in
-                VStack(alignment: .leading) {
-                    HStack {
-                        if let url = URL(string: post.profileImageUrl) {
-                            WebImage(url: url)
-                                .resizable()
-                                .frame(width: 40, height: 40)
-                                .clipShape(Circle())
-                        } else {
-                            Image(systemName: "person.circle.fill")
-                                .resizable()
-                                .frame(width: 40, height: 40)
+            ScrollView {
+                
+                ForEach(filteredPosts) { post in
+                    VStack(alignment: .leading) {
+                        HStack {
+                            if let url = URL(string: post.profileImageUrl) {
+                                WebImage(url: url)
+                                    .resizable()
+                                    .frame(width: 40, height: 40)
+                                    .clipShape(Circle())
+                            } else {
+                                Image(systemName: "person.circle.fill")
+                                    .resizable()
+                                    .frame(width: 40, height: 40)
+                            }
+                            
+                            VStack(alignment: .leading) {
+                                Text(post.username)
+                                    .font(.headline)
+                                Text(post.email)
+                                    .font(.caption)
+                                    .foregroundColor(.gray)
+                            }
+                            Spacer()
                         }
                         
-                        VStack(alignment: .leading) {
-                            Text(post.username)
-                                .font(.headline)
-                            Text(post.email)
-                                .font(.caption)
+                        if let url = URL(string: post.imageUrl) {
+                            WebImage(url: url)
+                                .resizable()
+                                .scaledToFill()
+                                .frame(width: .infinity, height: 200)
+                                .clipped()
+                        }
+                        
+                        HStack {
+                            Image(systemName: "heart")
+                                .foregroundColor(.gray)
+                                .frame(width: 20, height: 20) // Set a definite frame size
+                            Text("\(post.countLike)")
+                                .foregroundColor(.gray)
+                            
+                            Button(action: {
+                                selectedPostID = post.id
+                                isCommentSheetPresented = true // Show comment sheet
+                            }) {
+                                Image(systemName: "message")
+                                    .frame(width: 20, height: 20) // Set a definite frame size
+                            }
+                            Text("\(post.countComment)")
                                 .foregroundColor(.gray)
                         }
                         
-                        Spacer()
-                    }
-                    
-                    if let url = URL(string: post.imageUrl) {
-                        AsyncImage(url: url) { image in
-                            image.resizable().scaledToFill()
-                        } placeholder: {
-                            ProgressView()
-                        }
-                    }
-                    
-                    HStack {
-                        Image(systemName: "heart")
+                        Text(post.content)
+                            .font(.subheadline)
+                            .padding(.vertical, 4)
+                        Text(post.location)
+                            .font(.caption)
                             .foregroundColor(.gray)
-                        Text("\(post.countLike)")
-                        
-                        Button(action: {
-                            selectedPostID = post.id
-                            isCommentSheetPresented = true // Show comment sheet
-                        }) {
-                            Image(systemName: "message")
-                        }
-                        Text("\(post.countComment)")
                     }
-                    .foregroundColor(.gray)
-                    
-                    Text(post.content)
-                        .font(.subheadline)
-                        .padding(.vertical, 4)
-                    Text(post.location)
-                        .font(.caption)
-                        .foregroundColor(.gray)
+                    .padding()
+                    .background(
+                        RoundedRectangle(cornerRadius: 10)
+                            .fill(Color.white)
+                            .shadow(radius: 5)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 10)
+                                    .stroke(getBorderColor(for: post.warningCount), lineWidth: 5)
+                            )
+                    )
+                    .padding(.horizontal)
+                    .padding(.top, 8)
                 }
-                .padding()
-                .background(
-                    RoundedRectangle(cornerRadius: 10)
-                        .fill(Color.white)
-                        .shadow(radius: 5)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 10)
-                                .stroke(getBorderColor(for: post.warningCount), lineWidth: 5)
-                        )
-                )
-                .padding(.horizontal)
-                .padding(.top, 8)
             }
-        }
-        .onAppear(perform: loadPosts)
-        .sheet(isPresented: $isCommentSheetPresented) {
-            if let postId = selectedPostID {
-                AdminCommentView(postId: postId) // Display AdminCommentView
+            .onAppear(perform: loadPosts)
+            .sheet(isPresented: $isCommentSheetPresented) {
+                if let postId = selectedPostID {
+                    AdminCommentView(postId: postId)
+                }
             }
         }
     }
     
-    // Load all posts and include warning count data
-    func loadPosts() {
+    // Load all posts and prepare initial filtered list
+    private func loadPosts() {
         let ref = Database.database().reference().child("posts")
         ref.observeSingleEvent(of: .value) { snapshot in
             var loadedPosts: [AdminPost] = []
+            var uniqueLocationSet: Set<String> = [] // Set to collect unique locations
             
             for child in snapshot.children {
                 if let snapshot = child as? DataSnapshot,
@@ -135,16 +181,40 @@ struct ActivityView: View {
                         countComment: postDict["count_comment"] as? Int ?? 0
                     )
                     
+                    uniqueLocationSet.insert(post.location) // Add location to set
                     fetchUserData(for: userId) { username, email, profileImageUrl, warningCount in
                         post.username = username
                         post.email = email
                         post.profileImageUrl = profileImageUrl
                         post.warningCount = warningCount
                         loadedPosts.append(post)
+                        
                         self.posts = loadedPosts
+                        self.filteredPosts = loadedPosts
+                        self.uniqueLocations = Array(uniqueLocationSet).sorted() // Prepare sorted list of unique locations
                     }
                 }
             }
+        }
+    }
+    
+    // Apply location filter based on searchText
+    private func applyLocationFilter() {
+        if searchText.isEmpty {
+            // If search is empty, show all posts
+            filteredPosts = posts
+        } else {
+            // Filter posts by location containing the search text
+            filteredPosts = posts.filter { $0.location.lowercased().contains(searchText.lowercased()) }
+        }
+    }
+    
+    // Update location suggestions based on searchText
+    private func updateLocationSuggestions() {
+        if searchText.isEmpty {
+            filteredLocations = [] // Clear suggestions if search is empty
+        } else {
+            filteredLocations = uniqueLocations.filter { $0.lowercased().contains(searchText.lowercased()) }
         }
     }
     
