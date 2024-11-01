@@ -72,7 +72,6 @@ struct DashboardView: View {
                                     NavigationLink(destination: AllUsersView()) {
                                         StatsCard(title: "Total Users", value: totalUsers, color: .blue)
                                     }
-                                    StatsCard(title: "Total Reports", value: totalReports, color: .red)
                                     NavigationLink(destination: ReportedUsersView()) {
                                         StatsCard(title: "Reported Users", value: totalReportedUsers, color: .orange)
                                     }
