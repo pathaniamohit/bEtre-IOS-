@@ -7,6 +7,7 @@ struct AllUsersView: View {
     @State private var showDeleteDialog: Bool = false
     @State private var showSuspendDialog: Bool = false
     @State private var selectedUser: AllUser? = nil
+    @State private var isAdmin: Bool = false // Track if current user is admin
     
     private let databaseRef = Database.database().reference()
     
@@ -29,15 +30,17 @@ struct AllUsersView: View {
                         
                         Spacer()
                         
-                        // Delete Button
-                        Button(action: {
-                            selectedUser = user
-                            showDeleteDialog = true
-                        }) {
-                            Image(systemName: "trash")
-                                .foregroundColor(.red)
+                        // Conditionally display Delete Button if the current user is an admin
+                        if isAdmin {
+                            Button(action: {
+                                selectedUser = user
+                                showDeleteDialog = true
+                            }) {
+                                Image(systemName: "trash")
+                                    .foregroundColor(.red)
+                            }
+                            .padding(.trailing, 10)
                         }
-                        .padding(.trailing, 10)
                         
                         // Suspend/Unsuspend Button
                         Button(action: {
@@ -55,7 +58,10 @@ struct AllUsersView: View {
             }
             .listStyle(PlainListStyle())
         }
-        .onAppear(perform: fetchUsers)
+        .onAppear {
+            checkIfAdmin()
+            fetchUsers()
+        }
         .alert(isPresented: $showDeleteDialog) {
             Alert(
                 title: Text("Delete User"),
@@ -71,6 +77,15 @@ struct AllUsersView: View {
                 primaryButton: .default(Text("Confirm"), action: toggleSuspendUser),
                 secondaryButton: .cancel()
             )
+        }
+    }
+    
+    private func checkIfAdmin() {
+        guard let currentUserId = Auth.auth().currentUser?.uid else { return }
+        databaseRef.child("users").child(currentUserId).child("role").observeSingleEvent(of: .value) { snapshot in
+            if let role = snapshot.value as? String, role == "admin" {
+                self.isAdmin = true // Set to true if current user is an admin
+            }
         }
     }
     
