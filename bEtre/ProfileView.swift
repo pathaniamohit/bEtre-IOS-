@@ -42,6 +42,7 @@ struct UserPostView: View {
     @State private var showDeleteConfirmation = false
     @State private var username: String = ""
     @State private var profileImageUrl: String = ""
+    @State private var showEditPostView = false // State to trigger navigation to EditPostView
     
     var body: some View {
         VStack(alignment: .leading) {
@@ -138,6 +139,18 @@ struct UserPostView: View {
         .background(Color.white)
         .cornerRadius(10)
         .shadow(radius: 5)
+        .onTapGesture(count: 2) {
+                    showEditPostView = true
+                }
+                // Navigation link to EditPostView
+                .background(
+                    NavigationLink(
+                        destination: EditPostView(post: post),
+                        isActive: $showEditPostView,
+                        label: { EmptyView() }
+                    )
+                    .hidden() // Hide the NavigationLink's visual elements
+                )
     }
     
     // Fetches the username and profile image URL for the user who created the post
