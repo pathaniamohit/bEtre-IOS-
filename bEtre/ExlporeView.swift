@@ -188,126 +188,143 @@ struct ExploreView: View {
     }
     
     // Load Following Users and Fetch Posts Based on Following Status
-    func loadFollowingAndPosts() {
-        let followingRef = Database.database().reference().child("following").child(currentUserId)
-        
-        followingRef.observeSingleEvent(of: .value) { snapshot in
-            var followedUsers: Set<String> = []
+        func loadFollowingAndPosts() {
+            let followingRef = Database.database().reference().child("following").child(currentUserId)
             
-            for child in snapshot.children {
-                if let childSnapshot = child as? DataSnapshot, childSnapshot.value as? Bool == true {
-                    followedUsers.insert(childSnapshot.key)
+            followingRef.observeSingleEvent(of: .value) { snapshot in
+                var followedUsers: Set<String> = []
+                
+                for child in snapshot.children {
+                    if let childSnapshot = child as? DataSnapshot, childSnapshot.value as? Bool == true {
+                        followedUsers.insert(childSnapshot.key)
+                    }
                 }
-            }
-            
-            self.followingUsers = followedUsers
-            
-            // Fetch posts based on following list
-            if followedUsers.isEmpty {
-                // Fetch all posts excluding current user's posts if no following
-                self.fetchAllPostsExcludingCurrentUser()
-            } else {
-                // Fetch posts only from followed users
-                self.fetchPostsFromFollowedUsers()
-            }
-        }
-    }
-    
-    // Fetch Posts Only from Followed Users
-    func fetchPostsFromFollowedUsers() {
-        let ref = Database.database().reference().child("posts")
-        ref.observeSingleEvent(of: .value) { snapshot in
-            var loadedPosts: [Post] = []
-            
-            for child in snapshot.children {
-                if let snapshot = child as? DataSnapshot,
-                   let postDict = snapshot.value as? [String: Any],
-                   let userId = postDict["userId"] as? String, followingUsers.contains(userId) {
-                    
-                    var post = Post(
-                        id: snapshot.key,
-                        content: postDict["content"] as? String ?? "",
-                        timestamp: postDict["timestamp"] as? TimeInterval ?? 0,
-                        userId: userId,
-                        location: postDict["location"] as? String ?? "",
-                        imageUrl: postDict["imageUrl"] as? String ?? "",
-                        isReported: postDict["is_reported"] as? Bool ?? false,
-                        countLike: postDict["count_like"] as? Int ?? 0,
-                        countComment: postDict["count_comment"] as? Int ?? 0,
-                        isLiked: likedPosts.contains(snapshot.key)
-                    )
-                    
-                    fetchUserData(for: userId) { username, email, profileImageUrl in
-                        post.username = username
-                        post.email = email
-                        post.profileImageUrl = profileImageUrl
-                        loadedPosts.append(post)
-                        self.posts = loadedPosts
+                
+                self.followingUsers = followedUsers
+                
+                if followedUsers.isEmpty {
+                    // If the user is following no one, fetch all posts except those from the current user
+                    self.fetchAllPostsExcludingCurrentUser()
+                } else {
+                    // Fetch posts only from followed users who exist in the `users` node
+                    self.fetchPostsFromFollowedUsers(followedUsers) { postsFound in
+                        if !postsFound {
+                            // If no posts are found, fallback to fetching all posts excluding the current user's posts
+                            self.fetchAllPostsExcludingCurrentUser()
+                        }
                     }
                 }
             }
         }
-    }
     
     func getPostOwnerId(for postId: String) -> String? {
         posts.first { $0.id == postId }?.userId
     }
     
-    // Fetch All Posts Excluding Current User's Posts
-    func fetchAllPostsExcludingCurrentUser() {
-        let ref = Database.database().reference().child("posts")
-        ref.observeSingleEvent(of: .value) { snapshot in
-            var loadedPosts: [Post] = []
+    // Fetch Posts Only from Followed Users with Callback for Existence Check
+        func fetchPostsFromFollowedUsers(_ followedUsers: Set<String>, completion: @escaping (Bool) -> Void) {
+            let ref = Database.database().reference().child("posts")
+            ref.observeSingleEvent(of: .value) { snapshot in
+                var loadedPosts: [Post] = []
+                
+                for child in snapshot.children {
+                    if let snapshot = child as? DataSnapshot,
+                       let postDict = snapshot.value as? [String: Any],
+                       let userId = postDict["userId"] as? String,
+                       followedUsers.contains(userId) {
+                        
+                        checkUserExists(userId: userId) { exists in
+                            guard exists else { return } // Skip post if user doesn't exist
+                            
+                            var post = Post(
+                                id: snapshot.key,
+                                content: postDict["content"] as? String ?? "",
+                                timestamp: postDict["timestamp"] as? TimeInterval ?? 0,
+                                userId: userId,
+                                location: postDict["location"] as? String ?? "",
+                                imageUrl: postDict["imageUrl"] as? String ?? "",
+                                isReported: postDict["is_reported"] as? Bool ?? false,
+                                countLike: postDict["count_like"] as? Int ?? 0,
+                                countComment: postDict["count_comment"] as? Int ?? 0,
+                                isLiked: likedPosts.contains(snapshot.key)
+                            )
+                            
+                            fetchUserData(for: userId) { username, profileImageUrl in
+                                post.username = username
+                                post.profileImageUrl = profileImageUrl
+                                loadedPosts.append(post)
+                                self.posts = loadedPosts
+                            }
+                        }
+                    }
+                }
+                
+                // Complete with `true` if posts were found, otherwise `false`
+                completion(!loadedPosts.isEmpty)
+            }
+        }
+        
+        // Check if a user exists in the `users` node
+        func checkUserExists(userId: String, completion: @escaping (Bool) -> Void) {
+            let userRef = Database.database().reference().child("users").child(userId)
             
-            for child in snapshot.children {
-                if let snapshot = child as? DataSnapshot,
-                   let postDict = snapshot.value as? [String: Any],
-                   let userId = postDict["userId"] as? String, userId != currentUserId {
-                    
-                    var post = Post(
-                        id: snapshot.key,
-                        content: postDict["content"] as? String ?? "",
-                        timestamp: postDict["timestamp"] as? TimeInterval ?? 0,
-                        userId: userId,
-                        location: postDict["location"] as? String ?? "",
-                        imageUrl: postDict["imageUrl"] as? String ?? "",
-                        isReported: postDict["is_reported"] as? Bool ?? false,
-                        countLike: postDict["count_like"] as? Int ?? 0,
-                        countComment: postDict["count_comment"] as? Int ?? 0
-                    )
-                    
-                    fetchUserData(for: userId) { username, email, profileImageUrl in
-                        post.username = username
-                        post.email = email
-                        post.profileImageUrl = profileImageUrl
-                        loadedPosts.append(post)
-                        self.posts = loadedPosts
+            userRef.observeSingleEvent(of: .value) { snapshot in
+                completion(snapshot.exists())
+            }
+        }
+        
+        // Fetch All Posts Excluding Current User's Posts
+        func fetchAllPostsExcludingCurrentUser() {
+            let ref = Database.database().reference().child("posts")
+            ref.observeSingleEvent(of: .value) { snapshot in
+                var loadedPosts: [Post] = []
+                
+                for child in snapshot.children {
+                    if let snapshot = child as? DataSnapshot,
+                       let postDict = snapshot.value as? [String: Any],
+                       let userId = postDict["userId"] as? String,
+                       userId != currentUserId {
+                        
+                        checkUserExists(userId: userId) { exists in
+                            guard exists else { return } // Skip post if user doesn't exist
+                            
+                            var post = Post(
+                                id: snapshot.key,
+                                content: postDict["content"] as? String ?? "",
+                                timestamp: postDict["timestamp"] as? TimeInterval ?? 0,
+                                userId: userId,
+                                location: postDict["location"] as? String ?? "",
+                                imageUrl: postDict["imageUrl"] as? String ?? "",
+                                isReported: postDict["is_reported"] as? Bool ?? false,
+                                countLike: postDict["count_like"] as? Int ?? 0,
+                                countComment: postDict["count_comment"] as? Int ?? 0
+                            )
+                            
+                            fetchUserData(for: userId) { username, profileImageUrl in
+                                post.username = username
+                                post.profileImageUrl = profileImageUrl
+                                loadedPosts.append(post)
+                                self.posts = loadedPosts
+                            }
+                        }
                     }
                 }
             }
         }
-    }
-    
-    
-    // Fetch User Data (username, email, profile image URL) using userId
-    func fetchUserData(for userId: String, completion: @escaping (String, String, String) -> Void) {
-        let userRef = Database.database().reference().child("users").child(userId)
-        
-        userRef.observeSingleEvent(of: .value) { snapshot in
-            if let userData = snapshot.value as? [String: Any] {
-                let username = userData["username"] as? String ?? "Unknown User"
-                let email = userData["email"] as? String ?? "No Email"
-                
-                // Fetch profile image URL from Firebase Storage
-                let profileImageRef = Storage.storage().reference().child("users/\(userId)/profile.jpg")
-                profileImageRef.downloadURL { url, _ in
-                    completion(username, email, url?.absoluteString ?? "")
+        // Fetch User Data (username, profileImageUrl) using userId
+        func fetchUserData(for userId: String, completion: @escaping (String, String) -> Void) {
+            let userRef = Database.database().reference().child("users").child(userId)
+            
+            userRef.observeSingleEvent(of: .value) { snapshot in
+                if let userData = snapshot.value as? [String: Any] {
+                    let username = userData["username"] as? String ?? "Unknown User"
+                    let profileImageUrl = userData["profileImageUrl"] as? String ?? ""
+                    completion(username, profileImageUrl)
+                } else {
+                    completion("Unknown User", "")
                 }
-            } else {
-                completion("Unknown User", "No Email", "")
             }
         }
-    }
     
     // Toggle Follow/Unfollow and update followers/following in Realtime Database
     func toggleFollow(userId: String) {
@@ -334,7 +351,7 @@ struct ExploreView: View {
     func toggleLike(postId: String, postOwnerId: String) {
         let ref = Database.database().reference()
         let likeRef = ref.child("likes").child(postId).child(currentUserId)
-        let postRef = ref.child("posts").child(postId)
+        _ = ref.child("posts").child(postId)
         
         if likedPosts.contains(postId) {
             // Unlike the post

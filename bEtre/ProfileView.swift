@@ -4,7 +4,7 @@ import FirebaseAuth
 import FirebaseDatabase
 import SDWebImageSwiftUI
 
-struct UserPost: Identifiable {
+struct UserPost: Identifiable, Hashable {
     var id: String
     var content: String
     var countComment: Int
@@ -465,68 +465,68 @@ struct ProfileView: View {
     }
     
     private func fetchFollowersCount() {
-            guard let userId = Auth.auth().currentUser?.uid else {
-                return
-            }
-            let ref = Database.database().reference().child("followers").child(userId)
-            
-            ref.observeSingleEvent(of: .value) { snapshot in
-                var count = 0
-                let dispatchGroup = DispatchGroup()
-                
-                for child in snapshot.children {
-                    if let childSnapshot = child as? DataSnapshot,
-                       let isFollower = childSnapshot.value as? Bool, isFollower == true {
-                        let followerId = childSnapshot.key
-                        dispatchGroup.enter()
-                        
-                        // Check if the user exists in the "users" node
-                        Database.database().reference().child("users").child(followerId).observeSingleEvent(of: .value) { userSnapshot in
-                            if userSnapshot.exists() {
-                                count += 1
-                            }
-                            dispatchGroup.leave()
-                        }
-                    }
-                }
-                
-                dispatchGroup.notify(queue: .main) {
-                    self.followerCount = count
-                }
-            }
+        guard let userId = Auth.auth().currentUser?.uid else {
+            return
         }
+        let ref = Database.database().reference().child("followers").child(userId)
         
-        private func fetchFollowingCount() {
-            guard let userId = Auth.auth().currentUser?.uid else {
-                return
-            }
-            let ref = Database.database().reference().child("following").child(userId)
+        ref.observeSingleEvent(of: .value) { snapshot in
+            var count = 0
+            let dispatchGroup = DispatchGroup()
             
-            ref.observeSingleEvent(of: .value) { snapshot in
-                var count = 0
-                let dispatchGroup = DispatchGroup()
-                
-                for child in snapshot.children {
-                    if let childSnapshot = child as? DataSnapshot,
-                       let isFollowing = childSnapshot.value as? Bool, isFollowing == true {
-                        let followeeId = childSnapshot.key
-                        dispatchGroup.enter()
-                        
-                        // Check if the user exists in the "users" node
-                        Database.database().reference().child("users").child(followeeId).observeSingleEvent(of: .value) { userSnapshot in
-                            if userSnapshot.exists() {
-                                count += 1
-                            }
-                            dispatchGroup.leave()
+            for child in snapshot.children {
+                if let childSnapshot = child as? DataSnapshot,
+                   let isFollower = childSnapshot.value as? Bool, isFollower == true {
+                    let followerId = childSnapshot.key
+                    dispatchGroup.enter()
+                    
+                    // Check if the user exists in the "users" node
+                    Database.database().reference().child("users").child(followerId).observeSingleEvent(of: .value) { userSnapshot in
+                        if userSnapshot.exists() {
+                            count += 1
                         }
+                        dispatchGroup.leave()
                     }
                 }
-                
-                dispatchGroup.notify(queue: .main) {
-                    self.followingCount = count
-                }
+            }
+            
+            dispatchGroup.notify(queue: .main) {
+                self.followerCount = count
             }
         }
+    }
+    
+    private func fetchFollowingCount() {
+        guard let userId = Auth.auth().currentUser?.uid else {
+            return
+        }
+        let ref = Database.database().reference().child("following").child(userId)
+        
+        ref.observeSingleEvent(of: .value) { snapshot in
+            var count = 0
+            let dispatchGroup = DispatchGroup()
+            
+            for child in snapshot.children {
+                if let childSnapshot = child as? DataSnapshot,
+                   let isFollowing = childSnapshot.value as? Bool, isFollowing == true {
+                    let followeeId = childSnapshot.key
+                    dispatchGroup.enter()
+                    
+                    // Check if the user exists in the "users" node
+                    Database.database().reference().child("users").child(followeeId).observeSingleEvent(of: .value) { userSnapshot in
+                        if userSnapshot.exists() {
+                            count += 1
+                        }
+                        dispatchGroup.leave()
+                    }
+                }
+            }
+            
+            dispatchGroup.notify(queue: .main) {
+                self.followingCount = count
+            }
+        }
+    }
 }
 
 struct FollowersListView: View {

@@ -262,7 +262,7 @@ struct LocationPickerView: View {
                     .padding(.trailing)
             }
             
-            Map(coordinateRegion: $mapRegion, interactionModes: .all)
+            UserLocationMapView(coordinateRegion: $mapRegion, annotations: createAnnotations())
                 .edgesIgnoringSafeArea(.all)
             
             List(searchResults, id: \.self) { item in
@@ -292,7 +292,49 @@ struct LocationPickerView: View {
             searchResults = response.mapItems
         }
     }
+    
+    private func createAnnotations() -> [MKPointAnnotation] {
+        return searchResults.map { item in
+            let annotation = MKPointAnnotation()
+            annotation.coordinate = item.placemark.coordinate
+            annotation.title = item.name
+            return annotation
+        }
+    }
 }
+
+struct UserLocationMapView: UIViewRepresentable {
+    @Binding var coordinateRegion: MKCoordinateRegion
+    var annotations: [MKPointAnnotation]
+    
+    func makeUIView(context: Context) -> MKMapView {
+        let mapView = MKMapView()
+        mapView.delegate = context.coordinator
+        mapView.showsUserLocation = true
+        mapView.setRegion(coordinateRegion, animated: true)
+        mapView.addAnnotations(annotations)
+        return mapView
+    }
+    
+    func updateUIView(_ uiView: MKMapView, context: Context) {
+        uiView.setRegion(coordinateRegion, animated: true)
+        uiView.removeAnnotations(uiView.annotations)
+        uiView.addAnnotations(annotations)
+    }
+    
+    func makeCoordinator() -> Coordinator {
+        return Coordinator(self)
+    }
+    
+    class Coordinator: NSObject, MKMapViewDelegate {
+        var parent: UserLocationMapView
+        
+        init(_ parent: UserLocationMapView) {
+            self.parent = parent
+        }
+    }
+}
+
 
 struct ImagePicker: UIViewControllerRepresentable {
     @Binding var image: UIImage?
