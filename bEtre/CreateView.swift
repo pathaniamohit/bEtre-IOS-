@@ -33,7 +33,8 @@ struct CreateView: View {
                 Text("Create Post")
                     .font(.largeTitle)
                     .fontWeight(.bold)
-                    .padding(.top, -70)
+                    .padding(.top, -55)
+                    .padding(.bottom, 20)
                 
                 HStack {
                     if let profileImageUrl = profileImageUrl, let url = URL(string: profileImageUrl) {
