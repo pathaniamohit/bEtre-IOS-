@@ -21,7 +21,7 @@ class UserViewModel: ObservableObject {
     @Published var gender = "Male"
     @Published var followers: Int = 0
     @Published var following: Int = 0
-    @Published var bio: String = "" 
+    @Published var bio: String = ""
     @Published var loginEmail = ""
     @Published var loginPassword = ""
     
@@ -67,28 +67,12 @@ class UserViewModel: ObservableObject {
                 return
             }
             self?.isLoggedIn = true
-            self?.userId = result?.user.uid ?? "" 
+            self?.userId = result?.user.uid ?? ""
             self?.loadUserProfile()
             print("Login successful")
         }
     }
     
-    func resetPassword() {
-        guard Utils.isValidEmail(forgotEmail) else {
-            self.errorMessage = "Invalid email for password reset"
-            return
-        }
-        
-        Auth.auth().sendPasswordReset(withEmail: forgotEmail) { [weak self] error in
-            if let error = error {
-                self?.errorMessage = error.localizedDescription
-                print("Password reset error: \(error.localizedDescription)")
-                return
-            }
-            self?.isPasswordReset = true
-            print("Password reset email sent")
-        }
-    }
     
     private func saveAdditionalUserInfo() {
            guard let userId = Auth.auth().currentUser?.uid else { return }

@@ -11,6 +11,7 @@ import FirebaseDatabase
 import FirebaseAuth
 import FirebaseStorage
 import CoreLocation
+import MapKit
 
 struct CreateView: View {
     @State private var postText: String = ""
@@ -18,17 +19,23 @@ struct CreateView: View {
     @State private var imageUrl: String? = nil
     @State private var location: String? = nil
     @State private var showingImagePicker = false
-    @State private var showingLocationInput = false
+    @State private var showingLocationPicker = false
     @State private var isPosting = false
     @State private var userName: String = ""
     @State private var profileImageUrl: String? = nil
-    @State private var userInputLocation: String = ""
+    @State private var selectedCoordinate: CLLocationCoordinate2D? = nil
     
     let userId = Auth.auth().currentUser?.uid ?? "default_user"
     
     var body: some View {
         NavigationView {
             VStack {
+                Text("Create Post")
+                    .font(.largeTitle)
+                    .fontWeight(.bold)
+                    .padding(.top, -55)
+                    .padding(.bottom, 20)
+                
                 HStack {
                     if let profileImageUrl = profileImageUrl, let url = URL(string: profileImageUrl) {
                         AsyncImage(url: url) { image in
@@ -48,8 +55,11 @@ struct CreateView: View {
                     }
                     Text(userName.isEmpty ? "Loading..." : userName)
                         .font(.headline)
+                    
+                    Spacer()
                 }
                 .padding()
+                .padding(.top, -40)
                 
                 TextField("Write something...", text: $postText)
                     .padding()
@@ -74,7 +84,7 @@ struct CreateView: View {
                     }
                     
                     Button(action: {
-                        showingLocationInput.toggle()
+                        showingLocationPicker.toggle()
                     }) {
                         HStack {
                             Image(systemName: "mappin.and.ellipse")
@@ -118,18 +128,11 @@ struct CreateView: View {
                 }
                 .padding(.bottom)
             }
-            .navigationTitle("Create Post")
             .sheet(isPresented: $showingImagePicker, content: {
                 ImagePicker(image: $selectedImage)
             })
-            .alert("Enter Location", isPresented: $showingLocationInput) {
-                TextField("Enter location", text: $userInputLocation)
-                Button("Save", action: {
-                    location = userInputLocation 
-                })
-                Button("Cancel", role: .cancel, action: {})
-            } message: {
-                Text("Please enter your location")
+            .sheet(isPresented: $showingLocationPicker) {
+                LocationPickerView(selectedCoordinate: $selectedCoordinate, locationName: $location)
             }
             .onAppear {
                 fetchUserInfo()
@@ -137,27 +140,24 @@ struct CreateView: View {
         }
     }
     
-    // MARK: - Fetch User Info Method
     private func fetchUserInfo() {
         let ref = Database.database().reference().child("users").child(userId)
         
         ref.observeSingleEvent(of: .value) { snapshot in
             if let userData = snapshot.value as? [String: Any] {
-                self.userName = userData["userName"] as? String ?? "Unknown User"
+                self.userName = userData["username"] as? String ?? "Unknown User"
                 self.profileImageUrl = userData["profileImageUrl"] as? String
             }
         }
     }
     
-    // MARK: - Clear Data
     private func clearPostData() {
         postText = ""
         selectedImage = nil
         location = nil
-        userInputLocation = ""
+        selectedCoordinate = nil
     }
     
-    // MARK: - Create Post Method
     private func createPost() {
         isPosting = true
         
@@ -167,57 +167,174 @@ struct CreateView: View {
             return
         }
         
+        if let image = selectedImage {
+            uploadImageToStorage(image: image) { imageUrl in
+                guard let imageUrl = imageUrl else {
+                    print("Failed to upload image")
+                    self.isPosting = false
+                    return
+                }
+                self.savePostData(imageUrl: imageUrl)
+            }
+        } else {
+            savePostData(imageUrl: nil)
+        }
+    }
+    
+    private func savePostData(imageUrl: String?) {
         let postId = UUID().uuidString
         let ref = Database.database().reference().child("posts").child(postId)
+        
         var postData: [String: Any] = [
             "postId": postId,
             "userId": userId,
             "userName": userName,
-            "text": postText,
+            "content": postText,
             "timestamp": ServerValue.timestamp(),
             "location": location ?? ""
         ]
         
-        if let image = selectedImage {
-            uploadImageToStorage(image: image) { imageUrl in
-                postData["imageUrl"] = imageUrl
-                ref.setValue(postData) { error, _ in
-                    if let error = error {
-                        print("Error posting: \(error.localizedDescription)")
-                    } else {
-                        clearPostData()
+        if let imageUrl = imageUrl {
+            postData["imageUrl"] = imageUrl
+        }
+        
+        ref.setValue(postData) { error, _ in
+            if let error = error {
+                print("Error posting: \(error.localizedDescription)")
+            } else {
+                clearPostData()
+            }
+            isPosting = false
+        }
+    }
+    
+    func uploadImageToStorage(image: UIImage, completion: @escaping (String?) -> Void) {
+        let storageRef = Storage.storage().reference().child("post_images/\(UUID().uuidString).jpg")
+        
+        if let imageData = image.jpegData(compressionQuality: 0.8) {
+            let metadata = StorageMetadata()
+            metadata.contentType = "image/jpeg"
+            metadata.customMetadata = ["userId": userId]
+            
+            storageRef.putData(imageData, metadata: metadata) { metadata, error in
+                if error == nil {
+                    storageRef.downloadURL { url, error in
+                        if let url = url {
+                            print("Image uploaded successfully: \(url.absoluteString)")
+                            completion(url.absoluteString)
+                        } else {
+                            print("Error getting download URL: \(error?.localizedDescription ?? "Unknown error")")
+                            completion(nil)
+                        }
                     }
-                    isPosting = false
+                } else {
+                    print("Error uploading image: \(error?.localizedDescription ?? "Unknown error")")
+                    completion(nil)
                 }
             }
         } else {
-            ref.setValue(postData) { error, _ in
-                if let error = error {
-                    print("Error posting: \(error.localizedDescription)")
-                } else {
-                    clearPostData()
+            print("Error converting image to data.")
+            completion(nil)
+        }
+    }
+}
+
+struct LocationPickerView: View {
+    @Environment(\.presentationMode) var presentationMode
+    @Binding var selectedCoordinate: CLLocationCoordinate2D?
+    @Binding var locationName: String?
+    
+    @State private var mapRegion = MKCoordinateRegion(
+        center: CLLocationCoordinate2D(latitude: 37.7749, longitude: -122.4194),
+        span: MKCoordinateSpan(latitudeDelta: 0.05, longitudeDelta: 0.05)
+    )
+    @State private var searchText = ""
+    @State private var searchResults: [MKMapItem] = []
+    
+    var body: some View {
+        VStack {
+            HStack {
+                TextField("Search for a location", text: $searchText, onCommit: performSearch)
+                    .textFieldStyle(RoundedBorderTextFieldStyle())
+                    .padding()
+                
+                Button("Search", action: performSearch)
+                    .padding(.trailing)
+            }
+            
+            UserLocationMapView(coordinateRegion: $mapRegion, annotations: createAnnotations())
+                .edgesIgnoringSafeArea(.all)
+            
+            List(searchResults, id: \.self) { item in
+                Button(action: {
+                    mapRegion.center = item.placemark.coordinate
+                    locationName = item.name ?? "Selected Location"
+                    selectedCoordinate = item.placemark.coordinate
+                    presentationMode.wrappedValue.dismiss()
+                }) {
+                    Text(item.name ?? "Unknown Location")
                 }
-                isPosting = false
             }
         }
     }
     
-    // MARK: - Upload Image Method
-    private func uploadImageToStorage(image: UIImage, completion: @escaping (String?) -> Void) {
-        let storageRef = Storage.storage().reference().child("images/\(UUID().uuidString).jpg")
-        if let imageData = image.jpegData(compressionQuality: 0.8) {
-            storageRef.putData(imageData, metadata: nil) { metadata, error in
-                if error == nil {
-                    storageRef.downloadURL { url, error in
-                        completion(url?.absoluteString)
-                    }
-                } else {
-                    completion(nil)
-                }
+    private func performSearch() {
+        let request = MKLocalSearch.Request()
+        request.naturalLanguageQuery = searchText
+        request.region = mapRegion
+        
+        let search = MKLocalSearch(request: request)
+        search.start { response, error in
+            guard let response = response else {
+                print("Search error: \(error?.localizedDescription ?? "Unknown error")")
+                return
             }
+            searchResults = response.mapItems
+        }
+    }
+    
+    private func createAnnotations() -> [MKPointAnnotation] {
+        return searchResults.map { item in
+            let annotation = MKPointAnnotation()
+            annotation.coordinate = item.placemark.coordinate
+            annotation.title = item.name
+            return annotation
         }
     }
 }
+
+struct UserLocationMapView: UIViewRepresentable {
+    @Binding var coordinateRegion: MKCoordinateRegion
+    var annotations: [MKPointAnnotation]
+    
+    func makeUIView(context: Context) -> MKMapView {
+        let mapView = MKMapView()
+        mapView.delegate = context.coordinator
+        mapView.showsUserLocation = true
+        mapView.setRegion(coordinateRegion, animated: true)
+        mapView.addAnnotations(annotations)
+        return mapView
+    }
+    
+    func updateUIView(_ uiView: MKMapView, context: Context) {
+        uiView.setRegion(coordinateRegion, animated: true)
+        uiView.removeAnnotations(uiView.annotations)
+        uiView.addAnnotations(annotations)
+    }
+    
+    func makeCoordinator() -> Coordinator {
+        return Coordinator(self)
+    }
+    
+    class Coordinator: NSObject, MKMapViewDelegate {
+        var parent: UserLocationMapView
+        
+        init(_ parent: UserLocationMapView) {
+            self.parent = parent
+        }
+    }
+}
+
 
 struct ImagePicker: UIViewControllerRepresentable {
     @Binding var image: UIImage?

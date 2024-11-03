@@ -11,11 +11,16 @@ import FirebaseStorage
 import FirebaseDatabase
 
 struct EditProfileView: View {
-    @ObservedObject var userViewModel: UserViewModel
     @Environment(\.dismiss) var dismiss
+    @Binding var bio: String
     @State private var showingImagePicker = false
     @State private var inputImage: UIImage?
     @State private var showingPasswordChangeSheet = false
+    @State private var username = ""
+    @State private var phoneNumber = ""
+    @State private var email = Auth.auth().currentUser?.email ?? ""
+    @State private var gender = "Male"
+    @State private var profileImageUrl = ""
     @State private var oldPassword = ""
     @State private var newPassword = ""
     @State private var confirmPassword = ""
@@ -27,8 +32,8 @@ struct EditProfileView: View {
                 Button(action: {
                     showingImagePicker = true
                 }) {
-                    if !userViewModel.profileImageUrl.isEmpty {
-                        AsyncImage(url: URL(string: userViewModel.profileImageUrl)) { image in
+                    if !profileImageUrl.isEmpty {
+                        AsyncImage(url: URL(string: profileImageUrl)) { image in
                             image.resizable()
                         } placeholder: {
                             Image(systemName: "person.circle.fill")
@@ -52,21 +57,21 @@ struct EditProfileView: View {
                     .font(.subheadline)
 
                 VStack(spacing: 16) {
-                    TextField("Username", text: $userViewModel.username)
+                    TextField("Username", text: $username)
                         .textFieldStyle(RoundedBorderTextFieldStyle())
                         .padding(.horizontal)
                         .background(Color.white)
                         .cornerRadius(10)
                         .shadow(radius: 5)
 
-                    TextField("Phone Number", text: $userViewModel.phoneNumber)
+                    TextField("Phone Number", text: $phoneNumber)
                         .keyboardType(.phonePad)
                         .textFieldStyle(RoundedBorderTextFieldStyle())
                         .padding(.horizontal)
                         .background(Color.white)
                         .cornerRadius(10)
                         .shadow(radius: 5)
-                        .onChange(of: userViewModel.phoneNumber) { newValue in
+                        .onChange(of: phoneNumber) { newValue in
                             phoneNumberError = validatePhoneNumber(newValue)
                         }
 
@@ -76,15 +81,22 @@ struct EditProfileView: View {
                             .font(.caption)
                             .padding(.horizontal)
                     }
+                    
+                    TextField("Bio", text: $bio)
+                                        .textFieldStyle(RoundedBorderTextFieldStyle())
+                                        .padding(.horizontal)
+                                        .background(Color.white)
+                                        .cornerRadius(10)
+                                        .shadow(radius: 5)
 
-                    TextField("Email", text: $userViewModel.email)
+                    TextField("Email", text: $email)
                         .disabled(true)
                         .textFieldStyle(RoundedBorderTextFieldStyle())
                         .padding(.horizontal)
                         .background(Color.gray.opacity(0.3))
                         .cornerRadius(10)
 
-                    Picker("Gender", selection: $userViewModel.gender) {
+                    Picker("Gender", selection: $gender) {
                         Text("Male").tag("Male")
                         Text("Female").tag("Female")
                     }
@@ -94,10 +106,12 @@ struct EditProfileView: View {
                     .cornerRadius(10)
                     .shadow(radius: 5)
                 }
+                
+                
 
                 Button(action: {
                     if phoneNumberError == nil {
-                        userViewModel.saveProfile()
+                        saveProfile()
                         dismiss()
                     }
                 }) {
@@ -143,7 +157,7 @@ struct EditProfileView: View {
         guard let inputImage = inputImage else { return }
 
         if let imageData = inputImage.jpegData(compressionQuality: 0.8) {
-            let storageRef = Storage.storage().reference().child("profile_images/\(userViewModel.userId).jpg")
+            let storageRef = Storage.storage().reference().child("profile_images/\(Auth.auth().currentUser?.uid ?? UUID().uuidString).jpg")
             storageRef.putData(imageData, metadata: nil) { metadata, error in
                 guard error == nil else {
                     print("Failed to upload image: \(error!.localizedDescription)")
@@ -151,8 +165,8 @@ struct EditProfileView: View {
                 }
                 storageRef.downloadURL { url, error in
                     if let url = url {
-                        userViewModel.profileImageUrl = url.absoluteString
-                        userViewModel.saveProfile()
+                        profileImageUrl = url.absoluteString
+                        saveProfile()
                     }
                 }
             }
@@ -199,9 +213,8 @@ struct EditProfileView: View {
             return
         }
 
-        
         let user = Auth.auth().currentUser
-        let credential = EmailAuthProvider.credential(withEmail: userViewModel.email, password: oldPassword)
+        let credential = EmailAuthProvider.credential(withEmail: email, password: oldPassword)
         user?.reauthenticate(with: credential, completion: { result, error in
             if let error = error {
                 print("Re-authentication failed: \(error.localizedDescription)")
@@ -216,11 +229,32 @@ struct EditProfileView: View {
             })
         })
     }
+
+    func saveProfile() {
+        guard let userId = Auth.auth().currentUser?.uid else { return }
+        let userRef = Database.database().reference().child("users/\(userId)")
+        let userData: [String: Any] = [
+            "username": username,
+            "phoneNumber": phoneNumber,
+            "email": email,
+            "gender": gender,
+            "profileImageUrl": profileImageUrl,
+            "bio": bio
+        ]
+        userRef.updateChildValues(userData) { error, ref in
+            if let error = error {
+                print("Failed to update profile: \(error.localizedDescription)")
+            } else {
+                print("Profile updated successfully")
+            }
+        }
+    }
 }
 
 struct EditProfileView_Previews: PreviewProvider {
+    @State static var bio: String = "Sample bio"
+    
     static var previews: some View {
-        let userViewModel = UserViewModel()
-        EditProfileView(userViewModel: userViewModel)
+        EditProfileView( bio: $bio)
     }
 }
