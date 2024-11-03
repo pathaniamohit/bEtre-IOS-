@@ -629,32 +629,47 @@ struct CommentView: View {
         notificationRef.child(notificationId).setValue(notificationData)
     }
     
-    // Submit report for inappropriate comment
-       func submitCommentReport() {
-           guard let commentId = selectedCommentId else { return }
-           guard let reporterId = Auth.auth().currentUser?.uid else { return }
-           
-           // Report the comment in the Firebase Database
-           let reportRef = Database.database().reference().child("reports").child("comments").child(commentId).childByAutoId()
-           
-           let reportData: [String: Any] = [
-               "reporterId": reporterId,
-               "reportedCommentUserId": postOwnerId, // Use postOwnerId or comment's userId if available
-               "postId": postId,
-               "timestamp": Date().timeIntervalSince1970,
-               "reason": reportReason,
-               "status": "pending"
-           ]
-           
-           reportRef.setValue(reportData) { error, _ in
-               if error == nil {
-                   // Reset and close dialog
-                   reportReason = ""
-                   isReportDialogPresented = false
-                   print("Comment reported successfully.")
-               } else {
-                   print("Failed to report comment:", error?.localizedDescription ?? "Unknown error")
-               }
-           }
-       }
+    func submitCommentReport() {
+        guard let commentId = selectedCommentId else { return }
+        guard let reporterId = Auth.auth().currentUser?.uid else { return }
+
+        // Path to the reported comment in the Firebase Database
+        let reportRef = Database.database().reference().child("report_comments").child(commentId)
+
+        // Retrieve the original comment details
+        let commentRef = Database.database().reference().child("comments").child(postId).child(commentId)
+        commentRef.observeSingleEvent(of: .value) { snapshot in
+            if let commentData = snapshot.value as? [String: Any] {
+                let reportedCommentUserId = commentData["userId"] as? String ?? ""
+                let content = commentData["content"] as? String ?? ""
+                let timestamp = commentData["timestamp"] as? TimeInterval ?? Date().timeIntervalSince1970
+
+                // Prepare the report data
+                let reportData: [String: Any] = [
+                    "reporterId": reporterId,
+                    "reportedCommentUserId": reportedCommentUserId,
+                    "postId": postId,
+                    "timestamp": Date().timeIntervalSince1970,
+                    "reason": reportReason,
+                    "status": "pending",
+                    "content": content
+                ]
+
+                // Save the report data to Firebase
+                reportRef.setValue(reportData) { error, _ in
+                    if error == nil {
+                        // Clear the reason and close the dialog
+                        reportReason = ""
+                        isReportDialogPresented = false
+                        print("Comment reported successfully.")
+                    } else {
+                        print("Failed to report comment:", error?.localizedDescription ?? "Unknown error")
+                    }
+                }
+            } else {
+                print("Failed to fetch comment details.")
+            }
+        }
+    }
+
 }
