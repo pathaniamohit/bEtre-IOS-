@@ -11,6 +11,7 @@ import FirebaseDatabase
 import FirebaseAuth
 import FirebaseStorage
 import CoreLocation
+import MapKit
 
 struct CreateView: View {
     @State private var postText: String = ""
@@ -18,11 +19,11 @@ struct CreateView: View {
     @State private var imageUrl: String? = nil
     @State private var location: String? = nil
     @State private var showingImagePicker = false
-    @State private var showingLocationInput = false
+    @State private var showingLocationPicker = false
     @State private var isPosting = false
     @State private var userName: String = ""
     @State private var profileImageUrl: String? = nil
-    @State private var userInputLocation: String = ""
+    @State private var selectedCoordinate: CLLocationCoordinate2D? = nil
     
     let userId = Auth.auth().currentUser?.uid ?? "default_user"
     
@@ -32,9 +33,9 @@ struct CreateView: View {
                 Text("Create Post")
                     .font(.largeTitle)
                     .fontWeight(.bold)
-                    .padding(.top, -70)
+                    .padding(.top, -55)
+                    .padding(.bottom, 20)
                 
-                // Display user profile image and username
                 HStack {
                     if let profileImageUrl = profileImageUrl, let url = URL(string: profileImageUrl) {
                         AsyncImage(url: url) { image in
@@ -60,7 +61,6 @@ struct CreateView: View {
                 .padding()
                 .padding(.top, -40)
                 
-                // Post text field
                 TextField("Write something...", text: $postText)
                     .padding()
                     .frame(height: 150)
@@ -68,7 +68,6 @@ struct CreateView: View {
                     .cornerRadius(8)
                     .padding(.horizontal)
                 
-                // Image selection and location input buttons
                 VStack {
                     Button(action: {
                         showingImagePicker.toggle()
@@ -85,7 +84,7 @@ struct CreateView: View {
                     }
                     
                     Button(action: {
-                        showingLocationInput.toggle()
+                        showingLocationPicker.toggle()
                     }) {
                         HStack {
                             Image(systemName: "mappin.and.ellipse")
@@ -101,7 +100,6 @@ struct CreateView: View {
                 
                 Spacer()
                 
-                // Discard and Post buttons
                 HStack {
                     Button(action: {
                         clearPostData()
@@ -133,14 +131,8 @@ struct CreateView: View {
             .sheet(isPresented: $showingImagePicker, content: {
                 ImagePicker(image: $selectedImage)
             })
-            .alert("Enter Location", isPresented: $showingLocationInput) {
-                TextField("Enter location", text: $userInputLocation)
-                Button("Save", action: {
-                    location = userInputLocation
-                })
-                Button("Cancel", role: .cancel, action: {})
-            } message: {
-                Text("Please enter your location")
+            .sheet(isPresented: $showingLocationPicker) {
+                LocationPickerView(selectedCoordinate: $selectedCoordinate, locationName: $location)
             }
             .onAppear {
                 fetchUserInfo()
@@ -159,15 +151,13 @@ struct CreateView: View {
         }
     }
     
-    // Clear post data fields
     private func clearPostData() {
         postText = ""
         selectedImage = nil
         location = nil
-        userInputLocation = ""
+        selectedCoordinate = nil
     }
     
-    // Create a post with text and optional image and location
     private func createPost() {
         isPosting = true
         
@@ -177,26 +167,20 @@ struct CreateView: View {
             return
         }
         
-        // First, check if there's an image to upload
         if let image = selectedImage {
-            // Upload the image and get the URL
             uploadImageToStorage(image: image) { imageUrl in
                 guard let imageUrl = imageUrl else {
                     print("Failed to upload image")
                     self.isPosting = false
                     return
                 }
-                
-                // Create the post with the image URL
                 self.savePostData(imageUrl: imageUrl)
             }
         } else {
-            // No image to upload, save the post without an image URL
             savePostData(imageUrl: nil)
         }
     }
     
-    // Save post data to Firebase
     private func savePostData(imageUrl: String?) {
         let postId = UUID().uuidString
         let ref = Database.database().reference().child("posts").child(postId)
@@ -224,14 +208,13 @@ struct CreateView: View {
         }
     }
     
-    // Upload selected image to Firebase Storage
     func uploadImageToStorage(image: UIImage, completion: @escaping (String?) -> Void) {
         let storageRef = Storage.storage().reference().child("post_images/\(UUID().uuidString).jpg")
         
         if let imageData = image.jpegData(compressionQuality: 0.8) {
             let metadata = StorageMetadata()
             metadata.contentType = "image/jpeg"
-            metadata.customMetadata = ["userId": userId] // Adds userId metadata to validate user ownership in storage rules
+            metadata.customMetadata = ["userId": userId]
             
             storageRef.putData(imageData, metadata: metadata) { metadata, error in
                 if error == nil {
@@ -255,6 +238,103 @@ struct CreateView: View {
         }
     }
 }
+
+struct LocationPickerView: View {
+    @Environment(\.presentationMode) var presentationMode
+    @Binding var selectedCoordinate: CLLocationCoordinate2D?
+    @Binding var locationName: String?
+    
+    @State private var mapRegion = MKCoordinateRegion(
+        center: CLLocationCoordinate2D(latitude: 37.7749, longitude: -122.4194),
+        span: MKCoordinateSpan(latitudeDelta: 0.05, longitudeDelta: 0.05)
+    )
+    @State private var searchText = ""
+    @State private var searchResults: [MKMapItem] = []
+    
+    var body: some View {
+        VStack {
+            HStack {
+                TextField("Search for a location", text: $searchText, onCommit: performSearch)
+                    .textFieldStyle(RoundedBorderTextFieldStyle())
+                    .padding()
+                
+                Button("Search", action: performSearch)
+                    .padding(.trailing)
+            }
+            
+            UserLocationMapView(coordinateRegion: $mapRegion, annotations: createAnnotations())
+                .edgesIgnoringSafeArea(.all)
+            
+            List(searchResults, id: \.self) { item in
+                Button(action: {
+                    mapRegion.center = item.placemark.coordinate
+                    locationName = item.name ?? "Selected Location"
+                    selectedCoordinate = item.placemark.coordinate
+                    presentationMode.wrappedValue.dismiss()
+                }) {
+                    Text(item.name ?? "Unknown Location")
+                }
+            }
+        }
+    }
+    
+    private func performSearch() {
+        let request = MKLocalSearch.Request()
+        request.naturalLanguageQuery = searchText
+        request.region = mapRegion
+        
+        let search = MKLocalSearch(request: request)
+        search.start { response, error in
+            guard let response = response else {
+                print("Search error: \(error?.localizedDescription ?? "Unknown error")")
+                return
+            }
+            searchResults = response.mapItems
+        }
+    }
+    
+    private func createAnnotations() -> [MKPointAnnotation] {
+        return searchResults.map { item in
+            let annotation = MKPointAnnotation()
+            annotation.coordinate = item.placemark.coordinate
+            annotation.title = item.name
+            return annotation
+        }
+    }
+}
+
+struct UserLocationMapView: UIViewRepresentable {
+    @Binding var coordinateRegion: MKCoordinateRegion
+    var annotations: [MKPointAnnotation]
+    
+    func makeUIView(context: Context) -> MKMapView {
+        let mapView = MKMapView()
+        mapView.delegate = context.coordinator
+        mapView.showsUserLocation = true
+        mapView.setRegion(coordinateRegion, animated: true)
+        mapView.addAnnotations(annotations)
+        return mapView
+    }
+    
+    func updateUIView(_ uiView: MKMapView, context: Context) {
+        uiView.setRegion(coordinateRegion, animated: true)
+        uiView.removeAnnotations(uiView.annotations)
+        uiView.addAnnotations(annotations)
+    }
+    
+    func makeCoordinator() -> Coordinator {
+        return Coordinator(self)
+    }
+    
+    class Coordinator: NSObject, MKMapViewDelegate {
+        var parent: UserLocationMapView
+        
+        init(_ parent: UserLocationMapView) {
+            self.parent = parent
+        }
+    }
+}
+
 
 struct ImagePicker: UIViewControllerRepresentable {
     @Binding var image: UIImage?

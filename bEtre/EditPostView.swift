@@ -1,32 +1,49 @@
-//
-//  EditPostView.swift
-//  bEtre
-//
-//  Created by Mohit Pathania on 2024-10-28.
-//
-
 import SwiftUI
 import Firebase
 import FirebaseDatabase
 import FirebaseAuth
+import MapKit
+
+struct IdentifiableMapItem: Identifiable {
+    let id = UUID()
+    let mapItem: MKMapItem
+}
 
 struct EditPostView: View {
     @State var post: UserPost
-    @Environment(\.dismiss) var dismiss // To close the view after saving
-    @State private var isUpdating = false // For showing loading state during save
+    @Environment(\.dismiss) var dismiss
+    @State private var isUpdating = false
+    @State private var showingLocationSearch = false
+    @State private var selectedCoordinate: CLLocationCoordinate2D? = nil
+    @State private var locationName: String? = nil
+    
+    @State private var mapRegion = MKCoordinateRegion(
+        center: CLLocationCoordinate2D(latitude: 37.7749, longitude: -122.4194),
+        span: MKCoordinateSpan(latitudeDelta: 0.05, longitudeDelta: 0.05)
+    )
+    @State private var searchText = ""
+    @State private var searchResults: [IdentifiableMapItem] = []
 
     var body: some View {
-        NavigationView {
+        VStack {
             Form {
                 Section(header: Text("Post Content")) {
                     TextField("Update your post content", text: $post.content)
                 }
                 
                 Section(header: Text("Location")) {
-                    TextField("Location", text: $post.location)
+                    HStack {
+                        Text(locationName ?? post.location)
+                            .foregroundColor(.secondary)
+                        Spacer()
+                        Button(action: {
+                            showingLocationSearch.toggle()
+                        }) {
+                            Text("Select Location")
+                        }
+                    }
                 }
                 
-                // Display the existing image without allowing updates
                 Section(header: Text("Image")) {
                     if let imageUrl = URL(string: post.imageUrl) {
                         AsyncImage(url: imageUrl) { phase in
@@ -52,25 +69,100 @@ struct EditPostView: View {
                 }
             }
             .navigationTitle("Edit Post")
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") {
-                        savePost()
-                    }
+            
+            if showingLocationSearch {
+                ScrollView {
+                    locationSearchView()
                 }
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") {
-                        dismiss()
-                    }
+                .background(Color.white)
+            }
+            
+            HStack {
+                Button("Cancel") {
+                    dismiss()
+                }
+                .padding()
+                .frame(maxWidth: .infinity)
+                .background(Color.gray.opacity(0.2))
+                .cornerRadius(8)
+                
+                Button("Save") {
+                    savePost()
+                }
+                .padding()
+                .frame(maxWidth: .infinity)
+                .background(Color.blue)
+                .foregroundColor(.white)
+                .cornerRadius(8)
+            }
+            .padding(.horizontal)
+            .padding(.bottom)
+        }
+        .background(Color(.systemGroupedBackground))
+    }
+    
+    private func locationSearchView() -> some View {
+        VStack {
+            // Search bar
+            HStack {
+                TextField("Search for a location", text: $searchText, onCommit: performSearch)
+                    .textFieldStyle(RoundedBorderTextFieldStyle())
+                    .padding()
+                
+                Button("Search", action: performSearch)
+                    .padding(.trailing)
+            }
+            
+            // Map view with scrollable content
+            Map(coordinateRegion: $mapRegion, annotationItems: searchResults) { item in
+                MapPin(coordinate: item.mapItem.placemark.coordinate)
+            }
+            .frame(height: 300)
+            .cornerRadius(10)
+            .padding()
+            
+            // Search results list
+            List(searchResults) { item in
+                Button(action: {
+                    let coordinate = item.mapItem.placemark.coordinate
+                    locationName = item.mapItem.name ?? "Selected Location"
+                    selectedCoordinate = coordinate
+                    zoomToRegion(coordinate)  // Zoom to selected location
+                    showingLocationSearch = false // Dismiss search view
+                }) {
+                    Text(item.mapItem.name ?? "Unknown Location")
                 }
             }
+            .frame(height: 200) // Limit the list height for better scrolling
+        }
+        .background(Color.white)
+    }
+    
+    private func performSearch() {
+        let request = MKLocalSearch.Request()
+        request.naturalLanguageQuery = searchText
+        request.region = mapRegion
+        
+        let search = MKLocalSearch(request: request)
+        search.start { response, error in
+            guard let response = response else {
+                print("Search error: \(error?.localizedDescription ?? "Unknown error")")
+                return
+            }
+            searchResults = response.mapItems.map { IdentifiableMapItem(mapItem: $0) }
         }
     }
     
+    // Center and zoom in on the selected location
+    private func zoomToRegion(_ coordinate: CLLocationCoordinate2D) {
+        mapRegion = MKCoordinateRegion(
+            center: coordinate,
+            span: MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01)
+        )
+    }
+
     private func savePost() {
         isUpdating = true
-        
-        // Save post data with the existing image URL, without modifying the image
         savePostData()
     }
 
@@ -84,8 +176,8 @@ struct EditPostView: View {
         let ref = Database.database().reference().child("posts").child(post.id)
         let updatedData: [String: Any] = [
             "content": post.content,
-            "location": post.location,
-            "imageUrl": post.imageUrl // Ensure the existing image URL is kept as is
+            "location": locationName ?? post.location,
+            "imageUrl": post.imageUrl
         ]
 
         ref.updateChildValues(updatedData) { error, _ in

@@ -65,8 +65,8 @@ struct SearchView: View {
                     .background(Color(.systemGray6))
                     .cornerRadius(8)
                     .padding(.horizontal)
-                    .onChange(of: searchText) { newValue in
-                        if newValue.isEmpty {
+                    .onChange(of: searchText) {
+                        if searchText.isEmpty {
                             users.removeAll()
                             suggestions.removeAll()
                         } else {
@@ -211,7 +211,7 @@ struct SearchView: View {
         suggestions.removeAll()
         
         // Add username suggestions
-        for (userId, username) in userIdToUsernameMap {
+        for (_, username) in userIdToUsernameMap {
             if username.contains(query.lowercased()) {
                 suggestions.append(Suggestion(text: username, type: .username))
             }

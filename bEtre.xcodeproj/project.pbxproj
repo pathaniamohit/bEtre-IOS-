@@ -34,6 +34,10 @@
 		5526515C2CB4DC9A00E6B56A /* InboxAdmin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5526515B2CB4DC9A00E6B56A /* InboxAdmin.swift */; };
 		5526515E2CB4DCBF00E6B56A /* ProfileAdmin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5526515D2CB4DCBF00E6B56A /* ProfileAdmin.swift */; };
 		558FEF012CCF20F2003C5B17 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 558FEF002CCF20F2003C5B17 /* GoogleService-Info.plist */; };
+		55922EC42CD33F5F004EBD2C /* AllUsersView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 55922EC32CD33F5D004EBD2C /* AllUsersView.swift */; };
+		55922EC82CD34D2D004EBD2C /* ReportedUsersView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 55922EC72CD34D2B004EBD2C /* ReportedUsersView.swift */; };
+		55922ECA2CD35DE8004EBD2C /* AdminEditUser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 55922EC92CD35DE2004EBD2C /* AdminEditUser.swift */; };
+		55922ECC2CD3C9C6004EBD2C /* ViewModerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 55922ECB2CD3C9BF004EBD2C /* ViewModerator.swift */; };
 		55C923EE2CD0894500EA97D3 /* EditPostView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 55C923ED2CD0894500EA97D3 /* EditPostView.swift */; };
 		5981C0872CB485B800FD00B1 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5981C0862CB485B800FD00B1 /* SettingsView.swift */; };
 		59E0CB132CB0AC0E00B64AA3 /* FirebaseAnalytics in Frameworks */ = {isa = PBXBuildFile; productRef = 59E0CB122CB0AC0E00B64AA3 /* FirebaseAnalytics */; };
@@ -92,6 +96,10 @@
 		5526515B2CB4DC9A00E6B56A /* InboxAdmin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InboxAdmin.swift; sourceTree = "<group>"; };
 		5526515D2CB4DCBF00E6B56A /* ProfileAdmin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileAdmin.swift; sourceTree = "<group>"; };
 		558FEF002CCF20F2003C5B17 /* GoogleService-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
+		55922EC32CD33F5D004EBD2C /* AllUsersView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AllUsersView.swift; sourceTree = "<group>"; };
+		55922EC72CD34D2B004EBD2C /* ReportedUsersView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReportedUsersView.swift; sourceTree = "<group>"; };
+		55922EC92CD35DE2004EBD2C /* AdminEditUser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdminEditUser.swift; sourceTree = "<group>"; };
+		55922ECB2CD3C9BF004EBD2C /* ViewModerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewModerator.swift; sourceTree = "<group>"; };
 		55C923ED2CD0894500EA97D3 /* EditPostView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditPostView.swift; sourceTree = "<group>"; };
 		5981C0862CB485B800FD00B1 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		59E0CB3F2CB45D9000B64AA3 /* ProfileImagePicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileImagePicker.swift; sourceTree = "<group>"; };
@@ -210,6 +218,10 @@
 		5526515F2CB4DCEC00E6B56A /* Admin */ = {
 			isa = PBXGroup;
 			children = (
+				55922ECB2CD3C9BF004EBD2C /* ViewModerator.swift */,
+				55922EC92CD35DE2004EBD2C /* AdminEditUser.swift */,
+				55922EC72CD34D2B004EBD2C /* ReportedUsersView.swift */,
+				55922EC32CD33F5D004EBD2C /* AllUsersView.swift */,
 				5526515D2CB4DCBF00E6B56A /* ProfileAdmin.swift */,
 				552651572CB4DC7600E6B56A /* Dashboard.swift */,
 				552651592CB4DC8900E6B56A /* ActivityAdmin.swift */,
@@ -329,6 +341,7 @@
 				1815FE602CA792D9009000F9 /* InboxView.swift in Sources */,
 				5526515C2CB4DC9A00E6B56A /* InboxAdmin.swift in Sources */,
 				1815FE5C2CA7929F009000F9 /* SearchView.swift in Sources */,
+				55922EC42CD33F5F004EBD2C /* AllUsersView.swift in Sources */,
 				5981C0872CB485B800FD00B1 /* SettingsView.swift in Sources */,
 				59E0CB402CB45D9000B64AA3 /* ProfileImagePicker.swift in Sources */,
 				1815FE522CA32F37009000F9 /* LoginView.swift in Sources */,
@@ -343,8 +356,11 @@
 				189EA73C2CB8580500820D64 /* UserProfileView.swift in Sources */,
 				5526515A2CB4DC8900E6B56A /* ActivityAdmin.swift in Sources */,
 				1815FE372CA31AB6009000F9 /* bEtreApp.swift in Sources */,
+				55922ECA2CD35DE8004EBD2C /* AdminEditUser.swift in Sources */,
 				1815FE502CA32F08009000F9 /* SessionManager.swift in Sources */,
 				1815FE4E2CA32ECB009000F9 /* Utils.swift in Sources */,
+				55922EC82CD34D2D004EBD2C /* ReportedUsersView.swift in Sources */,
+				55922ECC2CD3C9C6004EBD2C /* ViewModerator.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

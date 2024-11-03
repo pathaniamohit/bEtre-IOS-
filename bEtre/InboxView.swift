@@ -1,6 +1,8 @@
 import SwiftUI
 import Firebase
 import FirebaseAuth
+import FirebaseDatabase
+import FirebaseStorage
 
 struct InboxView: View {
     @State private var notifications: [Notification] = []
@@ -29,23 +31,36 @@ struct InboxView: View {
     
     func loadNotifications() {
         let notificationRef = Database.database().reference().child("notifications").child(currentUserId)
-        notificationRef.observeSingleEvent(of: .value) { snapshot in
+        
+        // Using observe(.value) to enable real-time updates
+        notificationRef.observe(.value) { snapshot in
             var loadedNotifications: [Notification] = []
             
             for child in snapshot.children {
                 if let snapshot = child as? DataSnapshot,
                    let notificationData = snapshot.value as? [String: Any] {
                     let notificationId = snapshot.key
-                    let userId = notificationData["userId"] as? String ?? ""
+                    let senderUserId = notificationData["userId"] as? String ?? ""
                     
-                    // Fetch the username from the "users" node
-                    fetchUsername(for: userId) { username in
+                    // Fetch the sender's username
+                    fetchUsername(for: senderUserId) { username in
                         var notification = Notification(id: notificationId, data: notificationData)
-                        notification.username = username // Assign fetched username
-                        loadedNotifications.append(notification)
+                        notification.username = username
                         
-                        // Sort notifications by timestamp
-                        self.notifications = loadedNotifications.sorted(by: { $0.timestamp > $1.timestamp })
+                        // If it's a comment notification, fetch comment content
+                        if notification.type == .comment, let postId = notification.postId, let commentId = notificationData["commentId"] as? String {
+                            fetchCommentContent(postId: postId, commentId: commentId) { commentContent in
+                                notification.commentContent = commentContent
+                                loadedNotifications.append(notification)
+                                
+                                // Sort notifications by timestamp
+                                self.notifications = loadedNotifications.sorted(by: { $0.timestamp > $1.timestamp })
+                            }
+                        } else {
+                            // Non-comment notifications
+                            loadedNotifications.append(notification)
+                            self.notifications = loadedNotifications.sorted(by: { $0.timestamp > $1.timestamp })
+                        }
                     }
                 }
             }
@@ -60,6 +75,15 @@ struct InboxView: View {
             completion(username)
         }
     }
+    
+    // Helper function to fetch the comment content based on postId and commentId
+    func fetchCommentContent(postId: String, commentId: String, completion: @escaping (String) -> Void) {
+        let commentRef = Database.database().reference().child("comments").child(postId).child(commentId)
+        commentRef.observeSingleEvent(of: .value) { snapshot in
+            let content = snapshot.childSnapshot(forPath: "content").value as? String ?? "A comment"
+            completion(content)
+        }
+    }
 }
 
 struct Notification: Identifiable {
@@ -68,15 +92,18 @@ struct Notification: Identifiable {
     var userId: String
     var postId: String?
     var timestamp: TimeInterval
-    var username: String = "Unknown User" // Placeholder until fetched
+    var username: String = "Unknown User"
+    var commentContent: String? // Store the comment content for comment notifications
     
-    // Use `username` in the description instead of `userId`
+    // Description with dynamic comment content
     var description: String {
         switch type {
         case .follow: return "\(username) started following you."
         case .unfollow: return "\(username) unfollowed you."
         case .like: return "\(username) liked your post."
-        case .comment: return "\(username) commented on your post."
+        case .comment:
+            // Show the comment content in the notification description
+            return commentContent != nil ? "'\(commentContent!)' has been made on your post." : "\(username) commented on your post."
         case .report: return "\(username) reported your post."
         }
     }
