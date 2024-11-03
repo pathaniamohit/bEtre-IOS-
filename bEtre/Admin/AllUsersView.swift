@@ -4,10 +4,11 @@ import FirebaseAuth
 
 struct AllUsersView: View {
     @State private var users: [AllUser] = []
+    @State private var onlineUsers: Set<String> = [] // Track online user IDs
     @State private var showDeleteDialog: Bool = false
     @State private var showSuspendDialog: Bool = false
     @State private var selectedUser: AllUser? = nil
-    @State private var isAdmin: Bool = false // Track if current user is admin
+    @State private var isAdmin: Bool = false
     
     private let databaseRef = Database.database().reference()
     
@@ -20,6 +21,13 @@ struct AllUsersView: View {
             List {
                 ForEach(users) { user in
                     HStack {
+                        // Display green dot if user is online
+                        if onlineUsers.contains(user.id) {
+                            Circle()
+                                .fill(Color.green)
+                                .frame(width: 10, height: 10)
+                        }
+                        
                         VStack(alignment: .leading) {
                             Text(user.username)
                                 .font(.headline)
@@ -30,7 +38,6 @@ struct AllUsersView: View {
                         
                         Spacer()
                         
-                        // Conditionally display Delete Button if the current user is an admin
                         if isAdmin {
                             Button(action: {
                                 selectedUser = user
@@ -42,7 +49,6 @@ struct AllUsersView: View {
                             .padding(.trailing, 10)
                         }
                         
-                        // Suspend/Unsuspend Button
                         Button(action: {
                             selectedUser = user
                             showSuspendDialog = true
@@ -61,6 +67,7 @@ struct AllUsersView: View {
         .onAppear {
             checkIfAdmin()
             fetchUsers()
+            observeOnlineStatus()
         }
         .alert(isPresented: $showDeleteDialog) {
             Alert(
@@ -84,7 +91,7 @@ struct AllUsersView: View {
         guard let currentUserId = Auth.auth().currentUser?.uid else { return }
         databaseRef.child("users").child(currentUserId).child("role").observeSingleEvent(of: .value) { snapshot in
             if let role = snapshot.value as? String, role == "admin" {
-                self.isAdmin = true // Set to true if current user is an admin
+                self.isAdmin = true
             }
         }
     }
@@ -97,14 +104,14 @@ struct AllUsersView: View {
                    let userData = snapshot.value as? [String: Any],
                    let username = userData["username"] as? String,
                    let email = userData["email"] as? String,
-                   let role = userData["role"] as? String {
+                   let role = userData["role"] as? String,
+                   role != "admin", role != "moderator" {
                     
                     let user = AllUser(id: snapshot.key, username: username, email: email, role: role)
                     loadedUsers.append(user)
                 }
             }
             
-            // Sort users: Suspended users at the top
             self.users = loadedUsers.sorted { $0.role == "suspended" && $1.role != "suspended" }
         }
     }
@@ -114,7 +121,7 @@ struct AllUsersView: View {
         
         databaseRef.child("users").child(user.id).removeValue { error, _ in
             if error == nil {
-                fetchUsers() // Refresh user list
+                fetchUsers()
             }
         }
     }
@@ -125,10 +132,27 @@ struct AllUsersView: View {
         let newRole = user.role == "suspended" ? "user" : "suspended"
         databaseRef.child("users").child(user.id).child("role").setValue(newRole) { error, _ in
             if error == nil {
-                fetchUsers() // Refresh user list
+                fetchUsers()
             }
         }
     }
+    
+    private func observeOnlineStatus() {
+        databaseRef.child("users").observe(.value) { snapshot in
+            var onlineUserIDs = Set<String>()
+            
+            for child in snapshot.children {
+                if let childSnapshot = child as? DataSnapshot,
+                   let userData = childSnapshot.value as? [String: Any],
+                   let isOnline = userData["isOnline"] as? Bool,
+                   isOnline {
+                    onlineUserIDs.insert(childSnapshot.key)
+                }
+            }
+            self.onlineUsers = onlineUserIDs
+        }
+    }
+
 }
 
 struct AllUser: Identifiable {
@@ -137,4 +161,3 @@ struct AllUser: Identifiable {
     var email: String
     var role: String
 }
-

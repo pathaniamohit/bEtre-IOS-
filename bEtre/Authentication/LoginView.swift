@@ -154,11 +154,24 @@ struct LoginView: View {
             }
             
             if let userId = Auth.auth().currentUser?.uid {
+                setUserOnlineStatus(userId: userId) // Set the user online status to true
                 checkUserRole(userId: userId)
             }
         }
     }
 
+    private func setUserOnlineStatus(userId: String) {
+            let userRef = databaseRef.child("users").child(userId)
+
+            // Set the user as online
+            userRef.child("isOnline").setValue(true)
+            userRef.child("lastActive").setValue(ServerValue.timestamp())
+
+            // Set up the disconnect handler to mark the user offline on disconnect
+            userRef.child("isOnline").onDisconnectSetValue(false)
+            userRef.child("lastActive").onDisconnectSetValue(ServerValue.timestamp())
+        }
+    
     private func checkUserRole(userId: String) {
         databaseRef.child("users").child(userId).observeSingleEvent(of: .value) { snapshot in
             if snapshot.exists(), let userData = snapshot.value as? [String: Any], let role = userData["role"] as? String {

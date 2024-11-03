@@ -3,6 +3,33 @@ import FirebaseDatabase
 import Charts
 import FirebaseAuth
 
+struct TrendDataPoint: Identifiable {
+    let id = UUID()
+    let date: String
+    let count: Int
+}
+
+struct TrendChart: View {
+    var data: [TrendDataPoint]
+    var title: String
+
+    var body: some View {
+        VStack(alignment: .leading) {
+            Text(title)
+                .font(.subheadline)
+                .padding(.bottom, 5)
+            
+            Chart(data) {
+                LineMark(
+                    x: .value("Date", $0.date),
+                    y: .value("Count", $0.count)
+                )
+            }
+            .frame(height: 150)
+        }
+    }
+}
+
 struct DashboardView: View {
     @State private var totalUsers: Int = 0
     @State private var totalReports: Int = 0
@@ -18,6 +45,10 @@ struct DashboardView: View {
     @State private var selectedUserId: String?
     @State private var navigationPath = NavigationPath()
     @State private var isAdmin = false
+    @State private var totalPosts: Int = 0
+    @State private var totalLikes: Int = 0
+    @State private var totalComments: Int = 0
+
     
     private let databaseRef = Database.database().reference()
     
@@ -80,6 +111,11 @@ struct DashboardView: View {
                                             StatsCard(title: "Moderators", value: totalModerators, color: .purple)
                                         }
                                     }
+                                    // New Analytics Cards
+                                            StatsCard(title: "Total Posts", value: totalPosts, color: .blue)
+                                            StatsCard(title: "Total Likes", value: totalLikes, color: .green)
+                                            StatsCard(title: "Total Comments", value: totalComments, color: .orange)
+                                            
                                 }
                                 .padding(.bottom, 20)
                                 
@@ -95,6 +131,9 @@ struct DashboardView: View {
                                 fetchGenderData()
                                 fetchLocationData()
                                 fetchCommentsData()
+                                fetchTotalPosts()
+                                fetchTotalLikes()
+                                fetchTotalComments()
                             }
                         }
                         
@@ -172,15 +211,55 @@ struct DashboardView: View {
     
     private func fetchTotalUsers() {
         databaseRef.child("users").observeSingleEvent(of: .value) { snapshot in
-            self.totalUsers = Int(snapshot.childrenCount)
+            var userCount = 0
+            for child in snapshot.children {
+                if let snapshot = child as? DataSnapshot,
+                   let userData = snapshot.value as? [String: Any],
+                   let role = userData["role"] as? String,
+                   role != "admin", role != "moderator" { // Exclude admin and moderator roles
+                    userCount += 1
+                }
+            }
+            self.totalUsers = userCount
         }
     }
+
     
     private func fetchTotalReports() {
         databaseRef.child("reports").observeSingleEvent(of: .value) { snapshot in
             self.totalReports = Int(snapshot.childrenCount)
         }
     }
+    
+    private func fetchTotalPosts() {
+        databaseRef.child("posts").observeSingleEvent(of: .value) { snapshot in
+            self.totalPosts = Int(snapshot.childrenCount)
+        }
+    }
+
+    private func fetchTotalLikes() {
+        databaseRef.child("likes").observeSingleEvent(of: .value) { snapshot in
+            var likesCount = 0
+            for postSnapshot in snapshot.children {
+                if let post = postSnapshot as? DataSnapshot {
+                    likesCount += Int(post.childrenCount)
+                }
+            }
+            self.totalLikes = likesCount
+        }
+    }
+
+    private func fetchTotalComments() {
+        databaseRef.child("comments").observeSingleEvent(of: .value) { snapshot in
+            var commentsCount = 0
+            for case let postSnapshot as DataSnapshot in snapshot.children {
+                commentsCount += Int(postSnapshot.childrenCount)
+            }
+            self.totalComments = commentsCount
+        }
+    }
+
+
     
     private func fetchTotalReportedUsers() {
         var uniqueReportedUserIds = Set<String>()
