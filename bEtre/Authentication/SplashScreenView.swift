@@ -32,7 +32,8 @@ struct SplashScreenView: View {
                         .padding(.leading, -110)
 
                     Text("Be Real, Be You, bEtre")
-                        .font(.custom("roboto_serif_regular", size: 30))                        .foregroundColor(Color.mint)
+                        .font(.custom("roboto_serif_regular", size: 30))                        
+                        .foregroundColor(Color.mint)
                         .fontWeight(.bold)
                         .shadow(color: Color.black.opacity(0.5), radius: 4, x: 2, y: 2)
                         .padding(.trailing, 9)
@@ -51,6 +52,7 @@ struct SplashScreenView: View {
     
     private func checkAuthentication() {
         if let currentUser = Auth.auth().currentUser {
+            setUserOnlineStatus(userId: currentUser.uid) 
             checkUserRole(userId: currentUser.uid)
         } else {
             self.shouldNavigateToLogin = true
@@ -73,6 +75,18 @@ struct SplashScreenView: View {
             self.shouldNavigateToLogin = true
         }
     }
+    
+    private func setUserOnlineStatus(userId: String) {
+            let userRef = databaseRef.child("users").child(userId)
+
+            // Set the user as online
+            userRef.child("isOnline").setValue(true)
+            userRef.child("lastActive").setValue(ServerValue.timestamp())
+
+            // Set up the disconnect handler to mark the user offline on disconnect
+            userRef.child("isOnline").onDisconnectSetValue(false)
+            userRef.child("lastActive").onDisconnectSetValue(ServerValue.timestamp())
+        }
 }
 
 struct SplashScreenView_Previews: PreviewProvider {
