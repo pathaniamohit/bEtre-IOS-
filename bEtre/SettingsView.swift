@@ -1,12 +1,15 @@
 import SwiftUI
 import Firebase
 import FirebaseAuth
+import FirebaseStorage
+import  FirebaseDatabase
 
 struct SettingsView: View {
     @Environment(\.dismiss) var dismiss
     @State private var showLogoutAlert = false
     @State private var isLoggedOut = false
     @State private var bio: String = "Your bio here"
+    private var databaseRef: DatabaseReference = Database.database().reference()
 
     var body: some View {
         NavigationView {
@@ -71,6 +74,14 @@ struct SettingsView: View {
     }
 
     private func logoutUser() {
+        guard let userId = Auth.auth().currentUser?.uid else { return }
+        
+        // Explicitly set the user as offline in Firebase
+        let userRef = databaseRef.child("users").child(userId)
+        userRef.child("isOnline").setValue(false)
+        userRef.child("lastActive").setValue(ServerValue.timestamp())
+        
+        // Proceed with signing out
         do {
             try Auth.auth().signOut()
             isLoggedOut = true
@@ -78,6 +89,7 @@ struct SettingsView: View {
             print("Logout failed: \(error.localizedDescription)")
         }
     }
+
 }
 
 struct PrivacyScreen: View {
