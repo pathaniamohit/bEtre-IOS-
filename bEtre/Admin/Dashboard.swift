@@ -12,7 +12,7 @@ struct TrendDataPoint: Identifiable {
 struct TrendChart: View {
     var data: [TrendDataPoint]
     var title: String
-
+    
     var body: some View {
         VStack(alignment: .leading) {
             Text(title)
@@ -38,29 +38,39 @@ struct ReportDataPoint: Identifiable {
 }
 
 enum ReportType: String {
-    case comments = "Comments"
-    case posts = "Posts"
-    case profiles = "Profiles"
+    case comments = "Comments reported"
+    case posts = "Posts reported"
+    case profiles = "Profiles reported"
 }
 
-struct ReportsLineChart: View {
+struct ReportsBarChart: View {
     var data: [ReportDataPoint]
-
+    
     var body: some View {
-        Chart {
-            ForEach(data) { dataPoint in
-                LineMark(
-                    x: .value("Date", dataPoint.date),
-                    y: .value("Count", dataPoint.count)
-                )
-                .foregroundStyle(by: .value("Type", dataPoint.type.rawValue))
-                .symbol(by: .value("Type", dataPoint.type.rawValue))  // Different symbols for each line
+        VStack(alignment: .leading) {
+            Text("Reported Data")
+                .font(.subheadline)
+                .padding(.bottom, 5)
+            
+            Chart {
+                ForEach(data) { dataPoint in
+                    BarMark(
+                        x: .value("Date", dataPoint.date),
+                        y: .value("Count", dataPoint.count)
+                    )
+                    .foregroundStyle(by: .value("Type", dataPoint.type.rawValue))
+                    .symbol(by: .value("Type", dataPoint.type.rawValue))
+                }
             }
+            .frame(height: 300)
+            .chartXAxis(.hidden)
+            .padding()
         }
-        .frame(height: 300)
-        .padding()
+        .padding(.leading, 20)
+        .padding(.top, 20)
     }
 }
+
 
 struct DashboardView: View {
     @State private var totalUsers: Int = 0
@@ -80,7 +90,7 @@ struct DashboardView: View {
     @State private var totalPosts: Int = 0
     @State private var totalLikes: Int = 0
     @State private var totalComments: Int = 0
-
+    
     @State private var reportDataPoints: [ReportDataPoint] = []
     private let databaseRef = Database.database().reference()
     
@@ -144,10 +154,10 @@ struct DashboardView: View {
                                         }
                                     }
                                     // New Analytics Cards
-                                            StatsCard(title: "Total Posts", value: totalPosts, color: .blue)
-                                            StatsCard(title: "Total Likes", value: totalLikes, color: .green)
-                                            StatsCard(title: "Total Comments", value: totalComments, color: .orange)
-                                            
+                                    StatsCard(title: "Total Posts", value: totalPosts, color: .blue)
+                                    StatsCard(title: "Total Likes", value: totalLikes, color: .green)
+                                    StatsCard(title: "Total Comments", value: totalComments, color: .orange)
+                                    
                                 }
                                 .padding(.bottom, 20)
                                 
@@ -219,23 +229,10 @@ struct DashboardView: View {
                     }
                     .padding(.top, 20)
                     
-                    ReportsLineChart(data: reportDataPoints)
-                                        .onAppear {
-                                            fetchReportData()
-                                        }
-                    
-                    // Comments Section
-                    VStack(alignment: .leading, spacing: 10) {
-                        Text("Recent Comments")
-                            .font(.headline)
-                            .padding(.top, 20)
-                        
-                        ForEach(commentsDisplayData, id: \.id) { commentData in
-                            CommentAdminView(commentData: commentData)
-                                .padding(.horizontal)
+                    ReportsBarChart(data: reportDataPoints)
+                        .onAppear {
+                            fetchReportData()
                         }
-                    }
-                    .padding(.horizontal)
                     
                     Spacer()
                 }
@@ -262,86 +259,86 @@ struct DashboardView: View {
     }
     
     private func fetchReportData() {
-            // Clear previous data points
-            self.reportDataPoints = []
-
-            // Fetch data for each report type
-            fetchReportComments()
-            fetchReportPosts()
-            fetchReportProfiles()
-        }
-
-        private func fetchReportComments() {
-            databaseRef.child("report_comments").observe(.value) { snapshot in
-                var commentReportsByDate: [String: Int] = [:]
-                
-                for child in snapshot.children {
-                    if let childSnapshot = child as? DataSnapshot,
-                       let reportData = childSnapshot.value as? [String: Any],
-                       let timestamp = reportData["timestamp"] as? Double {
-                        
-                        let dateString = formattedDate(from: timestamp)
-                        commentReportsByDate[dateString, default: 0] += 1
-                    }
-                }
-
-                // Convert to data points
-                for (date, count) in commentReportsByDate {
-                    self.reportDataPoints.append(ReportDataPoint(date: date, count: count, type: .comments))
+        // Clear previous data points
+        self.reportDataPoints = []
+        
+        // Fetch data for each report type
+        fetchReportComments()
+        fetchReportPosts()
+        fetchReportProfiles()
+    }
+    
+    private func fetchReportComments() {
+        databaseRef.child("report_comments").observe(.value) { snapshot in
+            var commentReportsByDate: [String: Int] = [:]
+            
+            for child in snapshot.children {
+                if let childSnapshot = child as? DataSnapshot,
+                   let reportData = childSnapshot.value as? [String: Any],
+                   let timestamp = reportData["timestamp"] as? Double {
+                    
+                    let dateString = formattedDate(from: timestamp)
+                    commentReportsByDate[dateString, default: 0] += 1
                 }
             }
-        }
-
-        private func fetchReportPosts() {
-            databaseRef.child("reports").observe(.value) { snapshot in
-                var postReportsByDate: [String: Int] = [:]
-                
-                for child in snapshot.children {
-                    if let childSnapshot = child as? DataSnapshot,
-                       let reportData = childSnapshot.value as? [String: Any],
-                       let timestamp = reportData["timestamp"] as? Double {
-                        
-                        let dateString = formattedDate(from: timestamp)
-                        postReportsByDate[dateString, default: 0] += 1
-                    }
-                }
-
-                // Convert to data points
-                for (date, count) in postReportsByDate {
-                    self.reportDataPoints.append(ReportDataPoint(date: date, count: count, type: .posts))
-                }
+            
+            // Convert to data points
+            for (date, count) in commentReportsByDate {
+                self.reportDataPoints.append(ReportDataPoint(date: date, count: count, type: .comments))
             }
         }
-
-        private func fetchReportProfiles() {
-            databaseRef.child("reported_profiles").observe(.value) { snapshot in
-                var profileReportsByDate: [String: Int] = [:]
-                
-                for child in snapshot.children {
-                    if let childSnapshot = child as? DataSnapshot,
-                       let reportData = childSnapshot.value as? [String: Any],
-                       let timestamp = reportData["timestamp"] as? Double {
-                        
-                        let dateString = formattedDate(from: timestamp)
-                        profileReportsByDate[dateString, default: 0] += 1
-                    }
-                }
-
-                // Convert to data points
-                for (date, count) in profileReportsByDate {
-                    self.reportDataPoints.append(ReportDataPoint(date: date, count: count, type: .profiles))
+    }
+    
+    private func fetchReportPosts() {
+        databaseRef.child("reports").observe(.value) { snapshot in
+            var postReportsByDate: [String: Int] = [:]
+            
+            for child in snapshot.children {
+                if let childSnapshot = child as? DataSnapshot,
+                   let reportData = childSnapshot.value as? [String: Any],
+                   let timestamp = reportData["timestamp"] as? Double {
+                    
+                    let dateString = formattedDate(from: timestamp)
+                    postReportsByDate[dateString, default: 0] += 1
                 }
             }
+            
+            // Convert to data points
+            for (date, count) in postReportsByDate {
+                self.reportDataPoints.append(ReportDataPoint(date: date, count: count, type: .posts))
+            }
         }
-
-        // Helper function to format timestamp to date string
-        private func formattedDate(from timestamp: Double) -> String {
-            let date = Date(timeIntervalSince1970: timestamp / 1000)  // Convert milliseconds to seconds
-            let dateFormatter = DateFormatter()
-            dateFormatter.dateFormat = "yyyy-MM-dd"  // Example date format
-            return dateFormatter.string(from: date)
+    }
+    
+    private func fetchReportProfiles() {
+        databaseRef.child("reported_profiles").observe(.value) { snapshot in
+            var profileReportsByDate: [String: Int] = [:]
+            
+            for child in snapshot.children {
+                if let childSnapshot = child as? DataSnapshot,
+                   let reportData = childSnapshot.value as? [String: Any],
+                   let timestamp = reportData["timestamp"] as? Double {
+                    
+                    let dateString = formattedDate(from: timestamp)
+                    profileReportsByDate[dateString, default: 0] += 1
+                }
+            }
+            
+            // Convert to data points
+            for (date, count) in profileReportsByDate {
+                self.reportDataPoints.append(ReportDataPoint(date: date, count: count, type: .profiles))
+            }
         }
-
+    }
+    
+    // Helper function to format timestamp to date string
+    private func formattedDate(from timestamp: Double) -> String {
+        let date = Date(timeIntervalSince1970: timestamp / 1000)  // Convert milliseconds to seconds
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM-dd"  // Example date format
+        return dateFormatter.string(from: date)
+    }
+    
     
     private func fetchTotalReports() {
         databaseRef.child("reports").observeSingleEvent(of: .value) { snapshot in
@@ -354,7 +351,7 @@ struct DashboardView: View {
             self.totalPosts = Int(snapshot.childrenCount)
         }
     }
-
+    
     private func fetchTotalLikes() {
         databaseRef.child("likes").observeSingleEvent(of: .value) { snapshot in
             var likesCount = 0
@@ -366,7 +363,7 @@ struct DashboardView: View {
             self.totalLikes = likesCount
         }
     }
-
+    
     private func fetchTotalComments() {
         databaseRef.child("comments").observeSingleEvent(of: .value) { snapshot in
             var commentsCount = 0
@@ -376,8 +373,8 @@ struct DashboardView: View {
             self.totalComments = commentsCount
         }
     }
-
-
+    
+    
     
     private func fetchTotalReportedUsers() {
         var uniqueReportedUserIds = Set<String>()
@@ -414,29 +411,29 @@ struct DashboardView: View {
     }
     
     private func checkAdminStatus() {
-            guard let currentUser = Auth.auth().currentUser else { return }
-            databaseRef.child("users").child(currentUser.uid).observeSingleEvent(of: .value) { snapshot in
-                if let data = snapshot.value as? [String: Any],
-                   let role = data["role"] as? String {
-                    isAdmin = (role == "admin")
-                }
+        guard let currentUser = Auth.auth().currentUser else { return }
+        databaseRef.child("users").child(currentUser.uid).observeSingleEvent(of: .value) { snapshot in
+            if let data = snapshot.value as? [String: Any],
+               let role = data["role"] as? String {
+                isAdmin = (role == "admin")
             }
         }
-        
-        private func fetchTotalModerators() {
-            databaseRef.child("users").observeSingleEvent(of: .value) { snapshot in
-                var moderatorCount = 0
-                for child in snapshot.children {
-                    if let snapshot = child as? DataSnapshot,
-                       let userData = snapshot.value as? [String: Any],
-                       let role = userData["role"] as? String,
-                       role == "moderator" {
-                        moderatorCount += 1
-                    }
+    }
+    
+    private func fetchTotalModerators() {
+        databaseRef.child("users").observeSingleEvent(of: .value) { snapshot in
+            var moderatorCount = 0
+            for child in snapshot.children {
+                if let snapshot = child as? DataSnapshot,
+                   let userData = snapshot.value as? [String: Any],
+                   let role = userData["role"] as? String,
+                   role == "moderator" {
+                    moderatorCount += 1
                 }
-                self.totalModerators = moderatorCount
             }
+            self.totalModerators = moderatorCount
         }
+    }
     
     // Helper function to validate user IDs
     private func validateUserIds(_ reportedUserIds: [String]) {
