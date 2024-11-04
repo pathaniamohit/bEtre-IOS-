@@ -30,6 +30,38 @@ struct TrendChart: View {
     }
 }
 
+struct ReportDataPoint: Identifiable {
+    let id = UUID()
+    let date: String  // Formatted date string
+    let count: Int
+    let type: ReportType
+}
+
+enum ReportType: String {
+    case comments = "Comments"
+    case posts = "Posts"
+    case profiles = "Profiles"
+}
+
+struct ReportsLineChart: View {
+    var data: [ReportDataPoint]
+
+    var body: some View {
+        Chart {
+            ForEach(data) { dataPoint in
+                LineMark(
+                    x: .value("Date", dataPoint.date),
+                    y: .value("Count", dataPoint.count)
+                )
+                .foregroundStyle(by: .value("Type", dataPoint.type.rawValue))
+                .symbol(by: .value("Type", dataPoint.type.rawValue))  // Different symbols for each line
+            }
+        }
+        .frame(height: 300)
+        .padding()
+    }
+}
+
 struct DashboardView: View {
     @State private var totalUsers: Int = 0
     @State private var totalReports: Int = 0
@@ -49,7 +81,7 @@ struct DashboardView: View {
     @State private var totalLikes: Int = 0
     @State private var totalComments: Int = 0
 
-    
+    @State private var reportDataPoints: [ReportDataPoint] = []
     private let databaseRef = Database.database().reference()
     
     var body: some View {
@@ -187,6 +219,11 @@ struct DashboardView: View {
                     }
                     .padding(.top, 20)
                     
+                    ReportsLineChart(data: reportDataPoints)
+                                        .onAppear {
+                                            fetchReportData()
+                                        }
+                    
                     // Comments Section
                     VStack(alignment: .leading, spacing: 10) {
                         Text("Recent Comments")
@@ -223,6 +260,87 @@ struct DashboardView: View {
             self.totalUsers = userCount
         }
     }
+    
+    private func fetchReportData() {
+            // Clear previous data points
+            self.reportDataPoints = []
+
+            // Fetch data for each report type
+            fetchReportComments()
+            fetchReportPosts()
+            fetchReportProfiles()
+        }
+
+        private func fetchReportComments() {
+            databaseRef.child("report_comments").observe(.value) { snapshot in
+                var commentReportsByDate: [String: Int] = [:]
+                
+                for child in snapshot.children {
+                    if let childSnapshot = child as? DataSnapshot,
+                       let reportData = childSnapshot.value as? [String: Any],
+                       let timestamp = reportData["timestamp"] as? Double {
+                        
+                        let dateString = formattedDate(from: timestamp)
+                        commentReportsByDate[dateString, default: 0] += 1
+                    }
+                }
+
+                // Convert to data points
+                for (date, count) in commentReportsByDate {
+                    self.reportDataPoints.append(ReportDataPoint(date: date, count: count, type: .comments))
+                }
+            }
+        }
+
+        private func fetchReportPosts() {
+            databaseRef.child("reports").observe(.value) { snapshot in
+                var postReportsByDate: [String: Int] = [:]
+                
+                for child in snapshot.children {
+                    if let childSnapshot = child as? DataSnapshot,
+                       let reportData = childSnapshot.value as? [String: Any],
+                       let timestamp = reportData["timestamp"] as? Double {
+                        
+                        let dateString = formattedDate(from: timestamp)
+                        postReportsByDate[dateString, default: 0] += 1
+                    }
+                }
+
+                // Convert to data points
+                for (date, count) in postReportsByDate {
+                    self.reportDataPoints.append(ReportDataPoint(date: date, count: count, type: .posts))
+                }
+            }
+        }
+
+        private func fetchReportProfiles() {
+            databaseRef.child("reported_profiles").observe(.value) { snapshot in
+                var profileReportsByDate: [String: Int] = [:]
+                
+                for child in snapshot.children {
+                    if let childSnapshot = child as? DataSnapshot,
+                       let reportData = childSnapshot.value as? [String: Any],
+                       let timestamp = reportData["timestamp"] as? Double {
+                        
+                        let dateString = formattedDate(from: timestamp)
+                        profileReportsByDate[dateString, default: 0] += 1
+                    }
+                }
+
+                // Convert to data points
+                for (date, count) in profileReportsByDate {
+                    self.reportDataPoints.append(ReportDataPoint(date: date, count: count, type: .profiles))
+                }
+            }
+        }
+
+        // Helper function to format timestamp to date string
+        private func formattedDate(from timestamp: Double) -> String {
+            let date = Date(timeIntervalSince1970: timestamp / 1000)  // Convert milliseconds to seconds
+            let dateFormatter = DateFormatter()
+            dateFormatter.dateFormat = "yyyy-MM-dd"  // Example date format
+            return dateFormatter.string(from: date)
+        }
 
     
     private func fetchTotalReports() {
@@ -465,7 +583,7 @@ struct DashboardView: View {
     private func navigateToUserProfile(user: AdminUser) {
         self.suggestions = []
         self.searchText = ""
-        self.navigationPath.append(user.id) 
+        self.navigationPath.append(user.id)
     }
 }
 
