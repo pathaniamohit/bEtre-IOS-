@@ -27,6 +27,12 @@ struct AdminView: View {
                     Image(systemName: "envelope")
                     Text("Inbox")
                 }
+            
+            ReportedPostsView()
+                            .tabItem {
+                                Image(systemName: "exclamationmark.triangle")
+                                Text("Reports")
+                            }
 
             AdminProfileView()
                 .tabItem {

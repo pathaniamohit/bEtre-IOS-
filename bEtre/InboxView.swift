@@ -291,4 +291,3 @@ struct Notification: Identifiable {
         self.commentContent = commentContent
     }
 }
-
