@@ -163,28 +163,10 @@ struct ExploreView: View {
         })
         .sheet(isPresented: $isCommentSheetPresented) {
             if let postId = selectedPostID, let postOwnerId = getPostOwnerId(for: postId) {
-                CommentView(postId: postId, postOwnerId: postOwnerId, commentCount: $selectedPostCommentCount)
+                CommentView(postId: postId, commentCount: $selectedPostCommentCount)
             }
         }
         
-    }
-    
-    // Save Notification to Firebase Realtime Database
-    func saveNotification(to userId: String, type: String, additionalData: [String: Any] = [:]) {
-        let notificationRef = Database.database().reference().child("notifications").child(userId)
-        let notificationId = notificationRef.childByAutoId().key ?? UUID().uuidString
-        
-        var notificationData: [String: Any] = [
-            "type": type,
-            "userId": currentUserId,
-            "timestamp": Date().timeIntervalSince1970
-        ]
-        
-        additionalData.forEach { key, value in
-            notificationData[key] = value
-        }
-        
-        notificationRef.child(notificationId).setValue(notificationData)
     }
     
     // Load Following Users and Fetch Posts Based on Following Status
@@ -336,39 +318,63 @@ struct ExploreView: View {
             followingRef.removeValue()
             followersRef.removeValue()
             followingUsers.remove(userId)
-            saveNotification(to: userId, type: "unfollow")
         } else {
             // Follow: Add user to following and followers
             followingRef.setValue(true)
             followersRef.setValue(true)
             followingUsers.insert(userId)
-            sendFollowNotification(to: userId)
-            saveNotification(to: userId, type: "follow")
         }
     }
     
-    // Toggle Like
     func toggleLike(postId: String, postOwnerId: String) {
+        guard let userId = Auth.auth().currentUser?.uid else { return }
         let ref = Database.database().reference()
-        let likeRef = ref.child("likes").child(postId).child(currentUserId)
-        _ = ref.child("posts").child(postId)
-        
+        let likeRef = ref.child("likes").child(postId).child("users").child(userId)
+        let postLikesRef = ref.child("likes").child(postId)
+
         if likedPosts.contains(postId) {
             // Unlike the post
-            likeRef.removeValue()
-            likedPosts.remove(postId)
-            updateLikeCount(for: postId, increment: false)
+            likeRef.removeValue { error, _ in
+                if error == nil {
+                    likedPosts.remove(postId)
+                    updateLikeCount(for: postId, increment: false)
+
+                    // Remove the post owner reference if no users are left liking the post
+                    postLikesRef.child("users").observeSingleEvent(of: .value) { snapshot in
+                        if !snapshot.exists() {
+                            postLikesRef.child("ownerId").removeValue()
+                        }
+                    }
+                    
+                    // Toggle the heart icon color
+                    if let index = posts.firstIndex(where: { $0.id == postId }) {
+                        posts[index].isLiked = false // Update the post state to reflect "unliked"
+                    }
+                } else {
+                    print("Error unliking the post:", error?.localizedDescription ?? "Unknown error")
+                }
+            }
         } else {
             // Like the post
-            likeRef.setValue(true)
-            likedPosts.insert(postId)
-            saveNotification(to: postOwnerId, type: "like", additionalData: ["postId": postId])
-            updateLikeCount(for: postId, increment: true)
-        }
-        
-        // Toggle the `isLiked` status on the corresponding post in `posts` array
-        if let index = posts.firstIndex(where: { $0.id == postId }) {
-            posts[index].isLiked.toggle()
+            let likedAt = Date().timeIntervalSince1970
+            let likeData: [String: Any] = ["likedAt": likedAt]
+            
+            likeRef.setValue(likeData) { error, _ in
+                if error == nil {
+                    likedPosts.insert(postId)
+                    updateLikeCount(for: postId, increment: true)
+                    
+                    // Set the post owner if it's the first like
+                    postLikesRef.child("ownerId").setValue(postOwnerId)
+                    
+                    // Toggle the heart icon color
+                    if let index = posts.firstIndex(where: { $0.id == postId }) {
+                        posts[index].isLiked = true // Update the post state to reflect "liked"
+                    }
+                } else {
+                    print("Error liking the post:", error?.localizedDescription ?? "Unknown error")
+                }
+            }
         }
     }
     
@@ -392,56 +398,42 @@ struct ExploreView: View {
     
     func submitReport() {
         guard let postId = selectedPostID, !reportReason.isEmpty else { return }
-        guard let userId = Auth.auth().currentUser?.uid else { return }
+        guard let reporterId = Auth.auth().currentUser?.uid else { return }
         
-        guard let postOwnerId = getPostOwnerId(for: postId) else {
-            print("Post owner not found")
-            return
-        }
-        
-        let reportRef = Database.database().reference().child("reports").child(postId).child(userId)
-        reportRef.setValue(reportReason) { error, _ in
-            if error == nil {
-                // Clear the reason and close the dialog
-                self.reportReason = ""
-                self.isReportDialogPresented = false
-                saveNotification(to: postOwnerId, type: "report", additionalData: ["postId": postId, "reason": reportReason])
-            } else {
-                print("Failed to submit report:", error?.localizedDescription ?? "Unknown error")
-            }
-        }
-    }
-    
-    
-    // Send Follow Notification
-    func sendFollowNotification(to userId: String) {
-        let notificationRef = Database.database().reference().child("notifications").child(userId)
-        let notificationId = notificationRef.childByAutoId().key ?? UUID().uuidString
-        let notificationData: [String: Any] = [
-            "type": "follow",
-            "userId": currentUserId,
-            "timestamp": Date().timeIntervalSince1970
-        ]
-        notificationRef.child(notificationId).setValue(notificationData)
-    }
-    
-    // Send Like Notification
-    func sendLikeNotification(for postId: String) {
+        let reportRef = Database.database().reference().child("reports").childByAutoId()
         let postRef = Database.database().reference().child("posts").child(postId)
-        postRef.child("userId").observeSingleEvent(of: .value) { snapshot in
-            if let postOwnerId = snapshot.value as? String, postOwnerId != currentUserId {
-                let notificationRef = Database.database().reference().child("notifications").child(postOwnerId)
-                let notificationId = notificationRef.childByAutoId().key ?? UUID().uuidString
-                let notificationData: [String: Any] = [
-                    "type": "like",
-                    "userId": currentUserId,
+        
+        // Fetch post content to include in the report (optional)
+        postRef.observeSingleEvent(of: .value) { snapshot in
+            if let postData = snapshot.value as? [String: Any] {
+                let content = postData["content"] as? String ?? ""
+                let timestamp = Date().timeIntervalSince1970
+                
+                let reportData: [String: Any] = [
                     "postId": postId,
-                    "timestamp": Date().timeIntervalSince1970
+                    "reportedBy": reporterId,
+                    "reason": reportReason,
+                    "timestamp": timestamp,
+                    "status": "pending",
+                    "content": content
                 ]
-                notificationRef.child(notificationId).setValue(notificationData)
+                
+                // Save the report data in the "reports" node
+                reportRef.setValue(reportData) { error, _ in
+                    if error == nil {
+                        reportReason = ""
+                        isReportDialogPresented = false
+                        print("Report submitted successfully.")
+                    } else {
+                        print("Failed to submit report:", error?.localizedDescription ?? "Unknown error")
+                    }
+                }
+            } else {
+                print("Failed to fetch post details.")
             }
         }
     }
+
     
     // Increment Like Count
     func incrementLikeCount(for postId: String) {
@@ -469,66 +461,46 @@ struct ExploreView: View {
 
 struct CommentView: View {
     let postId: String
-        let postOwnerId: String
-        @Binding var commentCount: Int
-        @State private var comments: [Comment] = []
-        @State private var newCommentText: String = ""
-        @State private var isReportDialogPresented: Bool = false
-        @State private var reportReason: String = ""
-        @State private var selectedCommentId: String?
+    @Binding var commentCount: Int
+    @State private var comments: [Comment] = []
+    @State private var newCommentText: String = ""
+    @State private var selectedCommentId: String?
+    @State private var reportReason: String = ""
+    @State private var isReportDialogPresented: Bool = false
 
-        var body: some View {
-            VStack {
-                Text("Comments")
-                    .font(.headline)
-                    .padding()
-                
-                ScrollView {
-                    ForEach(comments) { comment in
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(comment.username)
-                                .font(.headline)
-                                .foregroundColor(.blue)
-                            Text(comment.content)
-                                .font(.body)
-                            Text(Date(timeIntervalSince1970: comment.timestamp), style: .time)
-                                .font(.caption)
-                                .foregroundColor(.gray)
-                            
-                            // Report Button
-                            Button(action: {
-                                selectedCommentId = comment.id
-                                isReportDialogPresented = true
-                            }) {
-                                Text("Report")
-                                    .foregroundColor(.red)
-                                    .font(.caption)
-                            }
-                            .padding(.top, 4)
-                        }
-                        .padding(.bottom, 8)
-                    }
-                }
+    var body: some View {
+        VStack {
+            Text("Comments")
+                .font(.headline)
                 .padding()
-                
-                // Add Comment Section (Optional, depending on admin or user)
-                HStack {
-                    TextField("Add a comment...", text: $newCommentText)
-                        .textFieldStyle(RoundedBorderTextFieldStyle())
-                        .padding([.leading, .bottom])
-                    
-                    Button(action: addComment) {
-                        Text("Post")
+            
+            ScrollView {
+                ForEach(comments) { comment in
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(comment.username)
                             .font(.headline)
-                            .foregroundColor(.white)
-                            .padding(8)
-                            .background(Color.blue)
-                            .cornerRadius(8)
+                            .foregroundColor(.blue)
+                        Text(comment.content)
+                            .font(.body)
+                        Text(Date(timeIntervalSince1970: comment.timestamp), style: .time)
+                            .font(.caption)
+                            .foregroundColor(.gray)
+                        
+                        // Report Button
+                        Button(action: {
+                            selectedCommentId = comment.id
+                            isReportDialogPresented = true
+                        }) {
+                            Text("Report")
+                                .foregroundColor(.red)
+                                .font(.caption)
+                        }
+                        .padding(.top, 4)
                     }
-                    .padding([.trailing, .bottom])
+                    .padding(.bottom, 8)
                 }
             }
-            .onAppear(perform: loadComments)
+            .padding()
             .alert("Report Comment", isPresented: $isReportDialogPresented, actions: {
                 TextField("Reason for reporting...", text: $reportReason)
                 Button("Submit", action: submitCommentReport)
@@ -536,12 +508,31 @@ struct CommentView: View {
             }, message: {
                 Text("Please specify your reason for reporting this comment.")
             })
+            
+            // Add Comment Section
+            HStack {
+                TextField("Add a comment...", text: $newCommentText)
+                    .textFieldStyle(RoundedBorderTextFieldStyle())
+                    .padding([.leading, .bottom])
+                
+                Button(action: addComment) {
+                    Text("Post")
+                        .font(.headline)
+                        .foregroundColor(.white)
+                        .padding(8)
+                        .background(Color.blue)
+                        .cornerRadius(8)
+                }
+                .padding([.trailing, .bottom])
+            }
         }
-    
+        .onAppear(perform: loadComments)
+    }
+
     // Load Comments for the Post
     func loadComments() {
-        let commentsRef = Database.database().reference().child("comments").child(postId)
-        commentsRef.observe(.value) { snapshot in
+        let commentsRef = Database.database().reference().child("comments")
+        commentsRef.queryOrdered(byChild: "post_Id").queryEqual(toValue: postId).observe(.value) { snapshot in
             var loadedComments: [Comment] = []
             
             for child in snapshot.children {
@@ -557,48 +548,42 @@ struct CommentView: View {
                     loadedComments.append(comment)
                 }
             }
-            
-            // Update the comments list
             self.comments = loadedComments.sorted { $0.timestamp < $1.timestamp }
         }
     }
     
-    // Add a New Comment with the User's Actual Username
+    // Add a New Comment
     func addComment() {
         guard !newCommentText.isEmpty else { return }
         guard let userId = Auth.auth().currentUser?.uid else { return }
         
-        let commentsRef = Database.database().reference().child("comments").child(postId)
+        let commentsRef = Database.database().reference().child("comments")
         let commentId = commentsRef.childByAutoId().key ?? UUID().uuidString
         
-        // Fetch the user's username from the "users" node
         let userRef = Database.database().reference().child("users").child(userId)
-        userRef.observeSingleEvent(of: .value) { snapshot, _ in
+        userRef.observeSingleEvent(of: .value) { snapshot in
             let username = snapshot.childSnapshot(forPath: "username").value as? String ?? "Unknown User"
             
-            // Prepare the comment data
             let newCommentData: [String: Any] = [
                 "content": self.newCommentText,
                 "timestamp": Date().timeIntervalSince1970,
                 "userId": userId,
-                "username": username
+                "username": username,
+                "post_Id": self.postId
             ]
             
-            // Save the comment data to Firebase
             commentsRef.child(commentId).setValue(newCommentData) { error, _ in
                 if error == nil {
-                    // Update the comment count in the post node
                     self.newCommentText = ""
-                    saveNotification(to: postOwnerId, type: "comment", additionalData: ["postId": postId, "commentId": commentId])
+                    incrementCommentCount()
                 }
             }
         }
     }
     
-    // Increment the Comment Count for the Post
+    // Increment Comment Count for the Post
     func incrementCommentCount() {
         let postRef = Database.database().reference().child("posts").child(postId).child("count_comment")
-        
         postRef.runTransactionBlock { currentData in
             var count = currentData.value as? Int ?? 0
             count += 1
@@ -606,45 +591,25 @@ struct CommentView: View {
             return TransactionResult.success(withValue: currentData)
         } andCompletionBlock: { error, _, snapshot in
             if let count = snapshot?.value as? Int {
-                // Update the comment count in the parent view
                 self.commentCount = count
             }
         }
     }
-    // Save Notification to Firebase Realtime Database
-    func saveNotification(to userId: String, type: String, additionalData: [String: Any] = [:]) {
-        let notificationRef = Database.database().reference().child("notifications").child(userId)
-        let notificationId = notificationRef.childByAutoId().key ?? UUID().uuidString
-        
-        var notificationData: [String: Any] = [
-            "type": type,
-            "userId": userId,
-            "timestamp": Date().timeIntervalSince1970
-        ]
-        
-        additionalData.forEach { key, value in
-            notificationData[key] = value
-        }
-        
-        notificationRef.child(notificationId).setValue(notificationData)
-    }
-    
+
+    // Submit Comment Report
     func submitCommentReport() {
         guard let commentId = selectedCommentId else { return }
         guard let reporterId = Auth.auth().currentUser?.uid else { return }
-
-        // Path to the reported comment in the Firebase Database
+        
         let reportRef = Database.database().reference().child("report_comments").child(commentId)
-
-        // Retrieve the original comment details
-        let commentRef = Database.database().reference().child("comments").child(postId).child(commentId)
+        let commentRef = Database.database().reference().child("comments").child(commentId)
+        
         commentRef.observeSingleEvent(of: .value) { snapshot in
             if let commentData = snapshot.value as? [String: Any] {
                 let reportedCommentUserId = commentData["userId"] as? String ?? ""
                 let content = commentData["content"] as? String ?? ""
                 let timestamp = commentData["timestamp"] as? TimeInterval ?? Date().timeIntervalSince1970
 
-                // Prepare the report data
                 let reportData: [String: Any] = [
                     "reporterId": reporterId,
                     "reportedCommentUserId": reportedCommentUserId,
@@ -654,11 +619,9 @@ struct CommentView: View {
                     "status": "pending",
                     "content": content
                 ]
-
-                // Save the report data to Firebase
+                
                 reportRef.setValue(reportData) { error, _ in
                     if error == nil {
-                        // Clear the reason and close the dialog
                         reportReason = ""
                         isReportDialogPresented = false
                         print("Comment reported successfully.")
@@ -671,5 +634,4 @@ struct CommentView: View {
             }
         }
     }
-
 }

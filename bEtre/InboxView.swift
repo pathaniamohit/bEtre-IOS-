@@ -2,7 +2,6 @@ import SwiftUI
 import Firebase
 import FirebaseAuth
 import FirebaseDatabase
-import FirebaseStorage
 
 struct InboxView: View {
     @State private var notifications: [Notification] = []
@@ -18,7 +17,7 @@ struct InboxView: View {
             
             List(notifications) { notification in
                 VStack(alignment: .leading) {
-                    Text(notification.description)
+                    notification.description
                         .font(.headline)
                     Text(Date(timeIntervalSince1970: notification.timestamp), style: .time)
                         .font(.caption)
@@ -30,58 +29,228 @@ struct InboxView: View {
     }
     
     func loadNotifications() {
-        let notificationRef = Database.database().reference().child("notifications").child(currentUserId)
+        print("Loading notifications for user: \(currentUserId)")
+        var loadedNotifications: [Notification] = []
+        let dispatchGroup = DispatchGroup()
         
-        // Using observe(.value) to enable real-time updates
-        notificationRef.observe(.value) { snapshot in
-            var loadedNotifications: [Notification] = []
-            
+        // Load follow notifications
+        dispatchGroup.enter()
+        loadFollowNotifications { followNotifications in
+            loadedNotifications.append(contentsOf: followNotifications)
+            dispatchGroup.leave()
+        }
+        
+        // Load like notifications
+        dispatchGroup.enter()
+        loadLikeNotifications { likeNotifications in
+            loadedNotifications.append(contentsOf: likeNotifications)
+            dispatchGroup.leave()
+        }
+        
+        // Load comment notifications
+        dispatchGroup.enter()
+        loadCommentNotifications { commentNotifications in
+            loadedNotifications.append(contentsOf: commentNotifications)
+            dispatchGroup.leave()
+        }
+        
+        // Update UI after all notifications are loaded
+        dispatchGroup.notify(queue: .main) {
+            self.notifications = loadedNotifications.sorted(by: { $0.timestamp > $1.timestamp })
+            print("Final notifications: \(self.notifications)")
+        }
+    }
+    
+    func loadFollowNotifications(completion: @escaping ([Notification]) -> Void) {
+        let followersRef = Database.database().reference().child("followers").child(currentUserId)
+        let dispatchGroup = DispatchGroup()
+        var followNotifications: [Notification] = []
+        
+        followersRef.observeSingleEvent(of: .value) { snapshot in
             for child in snapshot.children {
                 if let snapshot = child as? DataSnapshot,
-                   let notificationData = snapshot.value as? [String: Any] {
-                    let notificationId = snapshot.key
-                    let senderUserId = notificationData["userId"] as? String ?? ""
+                   let isFollowing = snapshot.value as? Bool, isFollowing {
+                    let followerId = snapshot.key
+                    dispatchGroup.enter()
                     
-                    // Fetch the sender's username
-                    fetchUsername(for: senderUserId) { username in
-                        var notification = Notification(id: notificationId, data: notificationData)
-                        notification.username = username
-                        
-                        // If it's a comment notification, fetch comment content
-                        if notification.type == .comment, let postId = notification.postId, let commentId = notificationData["commentId"] as? String {
-                            fetchCommentContent(postId: postId, commentId: commentId) { commentContent in
-                                notification.commentContent = commentContent
-                                loadedNotifications.append(notification)
-                                
-                                // Sort notifications by timestamp
-                                self.notifications = loadedNotifications.sorted(by: { $0.timestamp > $1.timestamp })
-                            }
-                        } else {
-                            // Non-comment notifications
-                            loadedNotifications.append(notification)
-                            self.notifications = loadedNotifications.sorted(by: { $0.timestamp > $1.timestamp })
-                        }
+                    fetchUsername(for: followerId) { username in
+                        let notification = Notification(
+                            id: UUID().uuidString,
+                            type: .follow,
+                            userId: followerId,
+                            timestamp: Date().timeIntervalSince1970,
+                            username: username
+                        )
+                        followNotifications.append(notification)
+                        dispatchGroup.leave()
                     }
                 }
+            }
+            
+            dispatchGroup.notify(queue: .main) {
+                completion(followNotifications)
             }
         }
     }
     
-    // Helper function to fetch a username based on userId
+    func loadLikeNotifications(completion: @escaping ([Notification]) -> Void) {
+        let likesRef = Database.database().reference().child("likes")
+        let dispatchGroup = DispatchGroup()
+        var likeNotifications: [Notification] = []
+        
+        print("Fetching likes from 'likes' node")
+        
+        // Access each postId in the "likes" node
+        likesRef.observeSingleEvent(of: .value) { snapshot in
+            for postSnapshot in snapshot.children {
+                if let postSnapshot = postSnapshot as? DataSnapshot {
+                    let postId = postSnapshot.key
+                    print("Found post with ID: \(postId)")
+                    
+                    // Retrieve the post owner userId directly from the "likes/{postId}/ownerId" path
+                    if let postOwnerId = postSnapshot.childSnapshot(forPath: "ownerId").value as? String {
+                        print("Post owner ID for post \(postId): \(postOwnerId)")
+                        
+                        // Check if the current user is the owner of the post
+                        if postOwnerId == currentUserId {
+                            print("Current user is the owner of post \(postId)")
+                            
+                            // Loop through each userId under this post's "users" in the likes node
+                            let usersSnapshot = postSnapshot.childSnapshot(forPath: "users")
+                            for userSnapshot in usersSnapshot.children {
+                                if let userSnapshot = userSnapshot as? DataSnapshot {
+                                    let likerUserId = userSnapshot.key
+                                    let likedAt = userSnapshot.childSnapshot(forPath: "likedAt").value as? TimeInterval ?? Date().timeIntervalSince1970
+                                    dispatchGroup.enter()
+                                    
+                                    // Fetch the username of the liker from the "users" node
+                                    fetchUsername(for: likerUserId) { likerUsername in
+                                        print("\(likerUsername) liked your post \(postId)")
+                                        
+                                        let notification = Notification(
+                                            id: UUID().uuidString,
+                                            type: .like,
+                                            userId: likerUserId,
+                                            postId: postId,
+                                            timestamp: likedAt,
+                                            username: likerUsername
+                                        )
+                                        
+                                        likeNotifications.append(notification)
+                                        dispatchGroup.leave()
+                                    }
+                                }
+                            }
+                        } else {
+                            print("Post \(postId) does not belong to the current user, skipping.")
+                        }
+                    } else {
+                        print("Error: Could not retrieve ownerId for post ID: \(postId)")
+                    }
+                }
+            }
+            
+            dispatchGroup.notify(queue: .main) {
+                print("All like notifications loaded: \(likeNotifications)")
+                completion(likeNotifications)
+            }
+        }
+    }
+
+//    // Helper function to fetch a username based on userId
+//    func fetchUsername(for userId: String, completion: @escaping (String) -> Void) {
+//        let userRef = Database.database().reference().child("users").child(userId)
+//        userRef.observeSingleEvent(of: .value) { snapshot in
+//            let username = snapshot.childSnapshot(forPath: "username").value as? String ?? "Unknown User"
+//            completion(username)
+//        }
+//    }
+
+
+
+//    // Helper function to fetch a username based on userId
+//    func fetchUsername(for userId: String, completion: @escaping (String) -> Void) {
+//        let userRef = Database.database().reference().child("users").child(userId)
+//        userRef.observeSingleEvent(of: .value) { snapshot in
+//            if snapshot.exists() {
+//                let username = snapshot.childSnapshot(forPath: "username").value as? String ?? "Unknown User"
+//                print("Fetched username: \(username) for userId: \(userId)")
+//                completion(username)
+//            } else {
+//                print("Error: No user found for userId \(userId)")
+//                completion("Unknown User")
+//            }
+//        }
+//    }
+
+    
+    func loadCommentNotifications(completion: @escaping ([Notification]) -> Void) {
+        let commentsRef = Database.database().reference().child("comments")
+        let dispatchGroup = DispatchGroup()
+        var commentNotifications: [Notification] = []
+        
+        print("Fetching comments for posts owned by user: \(currentUserId)")
+        
+        commentsRef.observeSingleEvent(of: .value) { snapshot in
+            for commentSnapshot in snapshot.children {
+                if let commentSnapshot = commentSnapshot as? DataSnapshot,
+                   let commentData = commentSnapshot.value as? [String: Any],
+                   let postId = commentData["post_Id"] as? String,
+                   let commenterId = commentData["userId"] as? String,
+                   let commentContent = commentData["content"] as? String,
+                   let timestamp = commentData["timestamp"] as? TimeInterval {
+                    
+                    // Fetch post to verify ownership
+                    dispatchGroup.enter()
+                    let postRef = Database.database().reference().child("posts").child(postId)
+                    
+                    postRef.observeSingleEvent(of: .value) { postSnapshot in
+                        guard let postData = postSnapshot.value as? [String: Any],
+                              let postOwnerId = postData["userId"] as? String else {
+                            print("Error: Could not retrieve post owner for post ID: \(postId)")
+                            dispatchGroup.leave()
+                            return
+                        }
+                        
+                        if postOwnerId == currentUserId {
+                            print("Adding comment notification for post ID \(postId)")
+                            
+                            // Fetch the username of the commenter
+                            fetchUsername(for: commenterId) { commenterUsername in
+                                let notification = Notification(
+                                    id: UUID().uuidString,
+                                    type: .comment,
+                                    userId: commenterId,
+                                    postId: postId,
+                                    timestamp: timestamp,
+                                    username: commenterUsername,
+                                    commentContent: commentContent  // Include comment content
+                                )
+                                
+                                commentNotifications.append(notification)
+                                dispatchGroup.leave()
+                            }
+                        } else {
+                            dispatchGroup.leave()
+                        }
+                    }
+                }
+            }
+            
+            dispatchGroup.notify(queue: .main) {
+                print("All comment notifications loaded: \(commentNotifications)")
+                completion(commentNotifications)
+            }
+        }
+    }
+
+
+
     func fetchUsername(for userId: String, completion: @escaping (String) -> Void) {
         let userRef = Database.database().reference().child("users").child(userId)
         userRef.observeSingleEvent(of: .value) { snapshot in
             let username = snapshot.childSnapshot(forPath: "username").value as? String ?? "Unknown User"
             completion(username)
-        }
-    }
-    
-    // Helper function to fetch the comment content based on postId and commentId
-    func fetchCommentContent(postId: String, commentId: String, completion: @escaping (String) -> Void) {
-        let commentRef = Database.database().reference().child("comments").child(postId).child(commentId)
-        commentRef.observeSingleEvent(of: .value) { snapshot in
-            let content = snapshot.childSnapshot(forPath: "content").value as? String ?? "A comment"
-            completion(content)
         }
     }
 }
@@ -93,26 +262,33 @@ struct Notification: Identifiable {
     var postId: String?
     var timestamp: TimeInterval
     var username: String = "Unknown User"
-    var commentContent: String? // Store the comment content for comment notifications
+    var commentContent: String? = nil  // New property for the comment content
     
-    // Description with dynamic comment content
-    var description: String {
+    var description: Text {
         switch type {
-        case .follow: return "\(username) started following you."
-        case .unfollow: return "\(username) unfollowed you."
-        case .like: return "\(username) liked your post."
+        case .follow:
+            return Text("\(username) started following you.")
+        case .like:
+            return Text("\(username) liked your post.")
         case .comment:
-            // Show the comment content in the notification description
-            return commentContent != nil ? "'\(commentContent!)' has been made on your post." : "\(username) commented on your post."
-        case .report: return "\(username) reported your post."
+            // Show the comment content with blue styling
+            return Text("\(username) commented: ").font(.headline) +
+                   Text(commentContent ?? "").foregroundColor(.blue)
+        case .unfollow:
+            return Text("\(username) unfollowed you.")
+        case .report:
+            return Text("\(username) reported your post.")
         }
     }
     
-    init(id: String, data: [String: Any]) {
+    init(id: String, type: NotificationType, userId: String, postId: String? = nil, timestamp: TimeInterval, username: String = "Unknown User", commentContent: String? = nil) {
         self.id = id
-        self.type = NotificationType(rawValue: data["type"] as? String ?? "") ?? .follow
-        self.userId = data["userId"] as? String ?? ""
-        self.postId = data["postId"] as? String
-        self.timestamp = data["timestamp"] as? TimeInterval ?? 0
+        self.type = type
+        self.userId = userId
+        self.postId = postId
+        self.timestamp = timestamp
+        self.username = username
+        self.commentContent = commentContent
     }
 }
+
