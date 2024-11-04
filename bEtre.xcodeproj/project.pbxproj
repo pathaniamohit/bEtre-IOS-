@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		181444A42CD9414100FB2AF5 /* ReportedPostView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 181444A32CD9414100FB2AF5 /* ReportedPostView.swift */; };
+		181444A62CD94BE900FB2AF5 /* PostDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 181444A52CD94BE900FB2AF5 /* PostDetailView.swift */; };
 		1815FE372CA31AB6009000F9 /* bEtreApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1815FE362CA31AB6009000F9 /* bEtreApp.swift */; };
 		1815FE392CA31AB6009000F9 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1815FE382CA31AB6009000F9 /* ContentView.swift */; };
 		1815FE3B2CA31AB9009000F9 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 1815FE3A2CA31AB9009000F9 /* Assets.xcassets */; };
@@ -68,6 +69,7 @@
 
 /* Begin PBXFileReference section */
 		181444A32CD9414100FB2AF5 /* ReportedPostView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReportedPostView.swift; sourceTree = "<group>"; };
+		181444A52CD94BE900FB2AF5 /* PostDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PostDetailView.swift; sourceTree = "<group>"; };
 		1815FE332CA31AB6009000F9 /* bEtre.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = bEtre.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		1815FE362CA31AB6009000F9 /* bEtreApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = bEtreApp.swift; sourceTree = "<group>"; };
 		1815FE382CA31AB6009000F9 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
@@ -173,6 +175,7 @@
 				1815FE612CA792EA009000F9 /* ProfileView.swift */,
 				1815FE5F2CA792D9009000F9 /* InboxView.swift */,
 				1815FE5D2CA792BF009000F9 /* CreateView.swift */,
+				181444A52CD94BE900FB2AF5 /* PostDetailView.swift */,
 				1815FE5B2CA7929F009000F9 /* SearchView.swift */,
 				1815FE592CA79213009000F9 /* ExlporeView.swift */,
 				552651532CB4D64000E6B56A /* maison.swift */,
@@ -357,6 +360,7 @@
 				1815FE462CA31AFB009000F9 /* SignUpView.swift in Sources */,
 				552651542CB4D64000E6B56A /* maison.swift in Sources */,
 				5526515E2CB4DCBF00E6B56A /* ProfileAdmin.swift in Sources */,
+				181444A62CD94BE900FB2AF5 /* PostDetailView.swift in Sources */,
 				189EA73C2CB8580500820D64 /* UserProfileView.swift in Sources */,
 				5526515A2CB4DC8900E6B56A /* ActivityAdmin.swift in Sources */,
 				1815FE372CA31AB6009000F9 /* bEtreApp.swift in Sources */,
