@@ -55,7 +55,7 @@ struct ReportsBarChart: View {
             Chart {
                 ForEach(data) { dataPoint in
                     BarMark(
-                        x: .value("Date", dataPoint.date),
+                        x: .value("Type", dataPoint.type.rawValue),
                         y: .value("Count", dataPoint.count)
                     )
                     .foregroundStyle(by: .value("Type", dataPoint.type.rawValue))
@@ -63,7 +63,6 @@ struct ReportsBarChart: View {
                 }
             }
             .frame(height: 300)
-            .chartXAxis(.hidden)
             .padding()
         }
         .padding(.leading, 20)
@@ -310,6 +309,7 @@ struct DashboardView: View {
         }
     }
     
+    
     private func fetchReportProfiles() {
         databaseRef.child("reported_profiles").observe(.value) { snapshot in
             var profileReportsByDate: [String: Int] = [:]
@@ -356,56 +356,79 @@ struct DashboardView: View {
         databaseRef.child("likes").observeSingleEvent(of: .value) { snapshot in
             var likesCount = 0
             for postSnapshot in snapshot.children {
-                if let post = postSnapshot as? DataSnapshot {
-                    likesCount += Int(post.childrenCount)
+                if let postSnapshot = postSnapshot as? DataSnapshot {
+                    let usersSnapshot = postSnapshot.childSnapshot(forPath: "users")
+                    likesCount += Int(usersSnapshot.childrenCount)
                 }
             }
             self.totalLikes = likesCount
         }
     }
     
+    
     private func fetchTotalComments() {
         databaseRef.child("comments").observeSingleEvent(of: .value) { snapshot in
-            var commentsCount = 0
-            for case let postSnapshot as DataSnapshot in snapshot.children {
-                commentsCount += Int(postSnapshot.childrenCount)
-            }
-            self.totalComments = commentsCount
+            self.totalComments = Int(snapshot.childrenCount)
         }
     }
     
-    
-    
     private func fetchTotalReportedUsers() {
         var uniqueReportedUserIds = Set<String>()
-        
-        // Fetch unique reported users from the "reports" node
+        let dispatchGroup = DispatchGroup()
+
+        // Fetch reported users from "reports" node (for reported posts)
         databaseRef.child("reports").observeSingleEvent(of: .value) { snapshot in
-            for postSnapshot in snapshot.children {
-                if let postSnapshot = postSnapshot as? DataSnapshot {
-                    for userSnapshot in postSnapshot.children {
-                        if let userSnapshot = userSnapshot as? DataSnapshot {
-                            uniqueReportedUserIds.insert(userSnapshot.key)
-                        }
-                    }
+            for child in snapshot.children {
+                if let reportSnapshot = child as? DataSnapshot,
+                   let reportData = reportSnapshot.value as? [String: Any],
+                   let reportedUserId = reportData["reportedBy"] as? String {
+                    uniqueReportedUserIds.insert(reportedUserId)
                 }
             }
             
-            // Fetch reported users from the "comments" node
-            databaseRef.child("comments").observeSingleEvent(of: .value) { commentsSnapshot in
-                for postSnapshot in commentsSnapshot.children {
-                    if let postSnapshot = postSnapshot as? DataSnapshot {
-                        for commentSnapshot in postSnapshot.children {
-                            if let commentData = (commentSnapshot as? DataSnapshot)?.value as? [String: Any],
-                               let reportedUserId = commentData["reportedCommentUserId"] as? String {
-                                uniqueReportedUserIds.insert(reportedUserId)
-                            }
-                        }
+            // Fetch reported users from "report_comments" node (for reported comments)
+            self.databaseRef.child("report_comments").observeSingleEvent(of: .value) { snapshot in
+                for child in snapshot.children {
+                    if let reportSnapshot = child as? DataSnapshot,
+                       let reportData = reportSnapshot.value as? [String: Any],
+                       let reportedUserId = reportData["reportedCommentUserId"] as? String {
+                        uniqueReportedUserIds.insert(reportedUserId)
                     }
                 }
                 
-                // Confirm each ID in uniqueReportedUserIds with the "users" node
-                self.validateUserIds(Array(uniqueReportedUserIds))
+                // Fetch reported users from "reported_profiles" node
+                self.databaseRef.child("reported_profiles").observeSingleEvent(of: .value) { snapshot in
+                    for child in snapshot.children {
+                        if let reportProfile = child as? DataSnapshot,
+                           let reportData = reportProfile.value as? [String: Any],
+                           let reportedUserId = reportData["reportedUserId"] as? String {
+                            uniqueReportedUserIds.insert(reportedUserId)
+                        }
+                    }
+
+                    // Validate existence of each unique user ID in the "users" node
+                    var validReportedUserCount = 0
+                    for userId in uniqueReportedUserIds {
+                        dispatchGroup.enter()
+                        self.databaseRef.child("users").child(userId).observeSingleEvent(of: .value) { snapshot in
+                            // Log the current user ID being checked for debugging
+                            print("Checking userId: \(userId)")
+                            if snapshot.exists() {
+                                print("User exists: \(userId)")
+                                validReportedUserCount += 1
+                            } else {
+                                print("User does not exist: \(userId)")
+                            }
+                            dispatchGroup.leave()
+                        }
+                    }
+                    
+                    // Update totalReportedUsers after all checks are complete
+                    dispatchGroup.notify(queue: .main) {
+                        self.totalReportedUsers = validReportedUserCount
+                        print("Total valid reported users: \(self.totalReportedUsers)")
+                    }
+                }
             }
         }
     }
