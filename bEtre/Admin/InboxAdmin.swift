@@ -239,36 +239,81 @@ struct WarningDialog: View {
     @Binding var warningMessage: String
     var onSend: () -> Void
     
+    @State private var isGuideline1Checked = false
+    @State private var isGuideline2Checked = false
+    @State private var isGuideline3Checked = false
+    
+    
     var body: some View {
         VStack(spacing: 20) {
             Text("Send Warning")
                 .font(.headline)
             
-            TextField("Enter warning message", text: $warningMessage)
-                .textFieldStyle(RoundedBorderTextFieldStyle())
-                .padding()
             
-            HStack {
-                Button("Cancel") {
-                    warningMessage = ""
-                }
-                .foregroundColor(.red)
+                Text("Guidelines : ")
+                    .font(.headline)
+                    .font(.system(size: 18))
                 
-                Spacer()
-                
-                Button("Send") {
-                    onSend()
+                VStack(alignment: .leading) {
+                    Toggle("Respect community standards", isOn: $isGuideline1Checked)
+                        .toggleStyle(CheckboxToggleStyle())
+                    
+                    Toggle("Avoid offensive language", isOn: $isGuideline2Checked)
+                        .toggleStyle(CheckboxToggleStyle())
+                    
+                    Toggle("No spam or irrelevant content", isOn: $isGuideline3Checked)
+                        .toggleStyle(CheckboxToggleStyle())
                 }
-                .disabled(warningMessage.isEmpty)
+                .padding()
+                
+                TextField("Enter warning message", text: $warningMessage)
+                    .textFieldStyle(RoundedBorderTextFieldStyle())
+                    .padding()
+                
+                HStack {
+                    Button("Cancel") {
+                        warningMessage = ""
+                    }
+                    .foregroundColor(.red)
+                    
+                    Spacer()
+                    
+                    Button("Send") {
+                        if isGuideline1Checked {
+                            warningMessage += "\n- Respect community standards"
+                        }
+                        if isGuideline2Checked {
+                            warningMessage += "\n- Avoid offensive language"
+                        }
+                        if isGuideline3Checked {
+                            warningMessage += "\n- No spam or irrelevant content"
+                        }
+                        onSend()
+                    }
+                   .disabled(warningMessage.isEmpty)
+                }
+                .padding()
             }
             .padding()
+            .background(Color.white)
+            .cornerRadius(10)
+            .shadow(radius: 10)
         }
-        .padding()
-        .background(Color.white)
-        .cornerRadius(10)
-        .shadow(radius: 10)
     }
-}
+struct CheckboxToggleStyle: ToggleStyle {
+       func makeBody(configuration: Configuration) -> some View {
+           Button(action: {
+               configuration.isOn.toggle()
+           }) {
+               HStack {
+                   Image(systemName: configuration.isOn ? "checkmark.square" : "square")
+                       .foregroundColor(configuration.isOn ? .blue : .gray)
+                   configuration.label
+               }
+           }
+           .buttonStyle(PlainButtonStyle())
+       }
+   }
 
 // Preview structure for testing
 struct InboxAdminView_Previews: PreviewProvider {
