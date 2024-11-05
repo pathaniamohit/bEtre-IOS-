@@ -284,12 +284,10 @@ struct ActivityView: View {
         let postRef = Database.database().reference().child("posts").child(post.id)
         let storageRef = Storage.storage().reference(forURL: post.imageUrl)
         
-        // Remove post data from Realtime Database
         postRef.removeValue { error, _ in
             if let error = error {
                 print("Failed to delete post: \(error.localizedDescription)")
             } else {
-                // Remove image from Firebase Storage
                 storageRef.delete { error in
                     if let error = error {
                         print("Failed to delete image: \(error.localizedDescription)")
