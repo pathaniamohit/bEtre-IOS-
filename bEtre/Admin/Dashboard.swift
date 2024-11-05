@@ -3,6 +3,14 @@ import FirebaseDatabase
 import Charts
 import FirebaseAuth
 
+struct Violation: Identifiable {
+    let id: String
+    let reason: String
+    let timestamp: TimeInterval
+    let userId: String
+    var username: String
+}
+
 struct SuspendedUsersPieChart: View {
     @State private var suspendedCount: Int = 0
     @State private var activeCount: Int = 0
@@ -174,6 +182,8 @@ struct DashboardView: View {
     @State private var reportDataPoints: [ReportDataPoint] = []
     private let databaseRef = Database.database().reference()
     
+    @State private var violations: [Violation] = []
+    
     var body: some View {
         NavigationStack(path: $navigationPath) {
             ScrollView {
@@ -256,6 +266,7 @@ struct DashboardView: View {
                                 fetchTotalPosts()
                                 fetchTotalLikes()
                                 fetchTotalComments()
+                                
                             }
                         }
                         
@@ -317,12 +328,102 @@ struct DashboardView: View {
                         .padding(.top, 20)
 
                     
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("Violation History")
+                            .font(.headline)
+                            .padding(.top)
+                        
+                        if violations.isEmpty {
+                            Text("No recent violations")
+                                .font(.subheadline)
+                                .foregroundColor(.gray)
+                        } else {
+                            ForEach(violations) { violation in
+                                HStack {
+                                    VStack(alignment: .leading) {
+                                        Text("Username: \(violation.username)")
+                                            .font(.subheadline)
+                                            .foregroundColor(.secondary)
+                                        Text("Reason: \(violation.reason)")
+                                            .font(.body)
+                                            .foregroundColor(.primary)
+                                        Text("Date: \(Date(timeIntervalSince1970: violation.timestamp), formatter: dateFormatter)")
+                                            .font(.caption)
+                                            .foregroundColor(.gray)
+                                    }
+                                    Spacer()
+                                }
+                                .padding(.vertical, 8)
+                                .background(Color(.systemGray6))
+                                .cornerRadius(8)
+                            }
+                        }
+                    }
+                    .padding(.horizontal)
+                    .onAppear(perform: fetchViolations)
+                    
                     Spacer()
+                    
+                    
                 }
             }
             .navigationDestination(for: String.self) { userId in
                 AdminEditUser(userId: userId)
             }
+        }
+    }
+    
+    private var dateFormatter: DateFormatter {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .none
+        return formatter
+    }
+    
+    private func fetchViolations() {
+        databaseRef.child("warnings").observeSingleEvent(of: .value) { snapshot in
+            var loadedViolations: [Violation] = []
+            let dispatchGroup = DispatchGroup() // Use DispatchGroup to wait for all username fetches to complete
+
+            for userSnapshot in snapshot.children {
+                if let userSnapshot = userSnapshot as? DataSnapshot {
+                    for warningSnapshot in userSnapshot.children {
+                        if let warningData = warningSnapshot as? DataSnapshot,
+                           let data = warningData.value as? [String: Any],
+                           let reason = data["reason"] as? String,
+                           let timestamp = data["timestamp"] as? TimeInterval,
+                           let userId = data["userId"] as? String {
+                               
+                            // Start fetching username for this userId
+                            dispatchGroup.enter()
+                            fetchUsername(for: userId) { username in
+                                let violation = Violation(
+                                    id: warningData.key,
+                                    reason: reason,
+                                    timestamp: timestamp,
+                                    userId: userId,
+                                    username: username // Assign fetched username
+                                )
+                                loadedViolations.append(violation)
+                                dispatchGroup.leave()
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Once all usernames are fetched, update the violations list on the main thread
+            dispatchGroup.notify(queue: .main) {
+                self.violations = loadedViolations.sorted(by: { $0.timestamp > $1.timestamp })
+            }
+        }
+    }
+    
+    private func fetchUsername(for userId: String, completion: @escaping (String) -> Void) {
+        let userRef = databaseRef.child("users").child(userId)
+        userRef.observeSingleEvent(of: .value) { snapshot in
+            let username = (snapshot.value as? [String: Any])?["username"] as? String ?? "Unknown User"
+            completion(username)
         }
     }
     
@@ -724,7 +825,6 @@ struct DashboardView: View {
                     }
                 }
             }
-
             
             // Update reportedComments only after all usernames are fetched
             dispatchGroup.notify(queue: .main) {
@@ -733,7 +833,6 @@ struct DashboardView: View {
             }
         }
     }
-
     
 }
 
