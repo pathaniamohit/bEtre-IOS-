@@ -11,6 +11,87 @@ struct Violation: Identifiable {
     var username: String
 }
 
+struct SuspendedUsersPieChart: View {
+    @State private var suspendedCount: Int = 0
+    @State private var activeCount: Int = 0
+    private let databaseRef = Database.database().reference()
+    
+    var body: some View {
+        VStack {
+            Text("User Suspension Status")
+                .font(.headline)
+                .padding(.bottom, 20)
+            
+            ZStack {
+                // Suspended Users Segment
+                Circle()
+                    .trim(from: 0, to: CGFloat(suspendedPercentage / 100))
+                    .stroke(Color.red, lineWidth: 30)
+                    .rotationEffect(.degrees(-90))
+                
+                // Active Users Segment
+                Circle()
+                    .trim(from: CGFloat(suspendedPercentage / 100), to: 1)
+                    .stroke(Color.green, lineWidth: 30)
+                    .rotationEffect(.degrees(-90))
+                
+                
+            }
+            .frame(width: 150, height: 150)
+            
+            HStack {
+                Label("Suspended", systemImage: "circle.fill")
+                    .foregroundColor(.red)
+                Text(String(format: "%.2f%%", suspendedPercentage))
+                
+                Label("Active", systemImage: "circle.fill")
+                    .foregroundColor(.green)
+                Text(String(format: "%.2f%%", activePercentage))
+            }
+            .font(.subheadline)
+            .padding(.top, 10)
+        }
+        .onAppear {
+            fetchUserSuspensionData()
+        }
+    }
+    
+    private var suspendedPercentage: Double {
+        let total = suspendedCount + activeCount
+        return total > 0 ? (Double(suspendedCount) / Double(total)) * 100 : 0
+    }
+    
+    private var activePercentage: Double {
+        100 - suspendedPercentage
+    }
+    
+    private func fetchUserSuspensionData() {
+        databaseRef.child("users").observeSingleEvent(of: .value) { snapshot in
+            var suspended = 0
+            var active = 0
+            
+            for child in snapshot.children {
+                if let userSnapshot = child as? DataSnapshot,
+                   let userData = userSnapshot.value as? [String: Any] {
+                    
+                    let role = userData["role"] as? String ?? ""
+                    let isSuspended = userData["suspended"] as? Bool ?? false
+                    
+                    if role == "suspended" || isSuspended {
+                        suspended += 1
+                    } else {
+                        active += 1
+                    }
+                }
+            }
+            
+            self.suspendedCount = suspended
+            self.activeCount = active
+        }
+    }
+}
+
+
 struct TrendDataPoint: Identifiable {
     let id = UUID()
     let date: String
@@ -243,6 +324,9 @@ struct DashboardView: View {
                         .onAppear {
                             fetchReportData()
                         }
+                    SuspendedUsersPieChart()
+                        .padding(.top, 20)
+
                     
                     VStack(alignment: .leading, spacing: 10) {
                         Text("Violation History")
@@ -742,7 +826,6 @@ struct DashboardView: View {
                 }
             }
             
-            
             // Update reportedComments only after all usernames are fetched
             dispatchGroup.notify(queue: .main) {
                 self.reportedComments = commentsList
@@ -750,7 +833,6 @@ struct DashboardView: View {
             }
         }
     }
-    
     
 }
 

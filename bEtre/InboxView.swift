@@ -54,6 +54,13 @@ struct InboxView: View {
             dispatchGroup.leave()
         }
         
+        // Load warning notifications
+        dispatchGroup.enter()
+        loadWarningNotifications { warningNotifications in
+            loadedNotifications.append(contentsOf: warningNotifications)
+            dispatchGroup.leave()
+        }
+        
         // Update UI after all notifications are loaded
         dispatchGroup.notify(queue: .main) {
             self.notifications = loadedNotifications.sorted(by: { $0.timestamp > $1.timestamp })
@@ -243,8 +250,34 @@ struct InboxView: View {
             }
         }
     }
-
-
+    
+    func loadWarningNotifications(completion: @escaping ([Notification]) -> Void) {
+        let warningsRef = Database.database().reference().child("warnings").child(currentUserId)
+        var warningNotifications: [Notification] = []
+        
+        warningsRef.observeSingleEvent(of: .value) { snapshot in
+            for warningSnapshot in snapshot.children {
+                if let warningSnapshot = warningSnapshot as? DataSnapshot,
+                   let warningData = warningSnapshot.value as? [String: Any],
+                   let warnedUserId = warningData["userId"] as? String,
+                   let reason = warningData["reason"] as? String,
+                   let timestamp = warningData["timestamp"] as? TimeInterval {
+                    
+                    let notification = Notification(
+                        id: warningSnapshot.key,
+                        type: .warning,
+                        userId: warnedUserId,
+                        timestamp: timestamp,
+                        reason: reason
+                    )
+                    
+                    warningNotifications.append(notification)
+                }
+            }
+            
+            completion(warningNotifications)
+        }
+    }
 
     func fetchUsername(for userId: String, completion: @escaping (String) -> Void) {
         let userRef = Database.database().reference().child("users").child(userId)
@@ -257,13 +290,14 @@ struct InboxView: View {
 
 struct Notification: Identifiable {
     var id: String
-    var type: NotificationType
+    var type: NotificationType1
     var userId: String
     var postId: String?
     var timestamp: TimeInterval
     var username: String = "Unknown User"
-    var commentContent: String? = nil  // New property for the comment content
-    
+    var commentContent: String? = nil
+    var reason: String? = nil  // New property for warning reason
+
     var description: Text {
         switch type {
         case .follow:
@@ -271,17 +305,20 @@ struct Notification: Identifiable {
         case .like:
             return Text("\(username) liked your post.")
         case .comment:
-            // Show the comment content with blue styling
             return Text("\(username) commented: ").font(.headline) +
                    Text(commentContent ?? "").foregroundColor(.blue)
         case .unfollow:
             return Text("\(username) unfollowed you.")
         case .report:
             return Text("\(username) reported your post.")
+        case .warning:
+            // Display warning reason in red color
+            return Text("Admin warned you: ").font(.headline) +
+                   Text(reason ?? "No reason provided").foregroundColor(.red)
         }
     }
     
-    init(id: String, type: NotificationType, userId: String, postId: String? = nil, timestamp: TimeInterval, username: String = "Unknown User", commentContent: String? = nil) {
+    init(id: String, type: NotificationType1, userId: String, postId: String? = nil, timestamp: TimeInterval, username: String = "Unknown User", commentContent: String? = nil, reason: String? = nil) {
         self.id = id
         self.type = type
         self.userId = userId
@@ -289,5 +326,16 @@ struct Notification: Identifiable {
         self.timestamp = timestamp
         self.username = username
         self.commentContent = commentContent
+        self.reason = reason
     }
 }
+
+enum NotificationType1 {
+    case follow
+    case like
+    case comment
+    case unfollow
+    case report
+    case warning  // Add this line for the warning notification type
+}
+
