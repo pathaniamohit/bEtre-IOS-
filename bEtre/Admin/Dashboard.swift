@@ -234,24 +234,6 @@ struct DashboardView: View {
                         }
                     
                     Spacer()
-                    
-                    // Reported Comments Section
-                    VStack(alignment: .leading, spacing: 15) {
-                        Text("Reported Comments")
-                            .font(.headline)
-                            .padding(.leading)
-                        
-                        ForEach(reportedComments) { comment in
-                            CommentAdminView(commentData: comment)
-                                .padding(.horizontal)
-                        }
-                    }
-                    .padding(.top, 20)
-                    .onAppear {
-                        fetchReportedComments() // Fetch reported comments when this view appears
-                    }
-                    
-                    Spacer()
                 }
             }
             .navigationDestination(for: String.self) { userId in

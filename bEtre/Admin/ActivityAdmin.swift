@@ -110,6 +110,15 @@ struct ActivityView: View {
                                     .foregroundColor(.gray)
                             }
                             Spacer()
+                            
+                            // Delete icon
+                            Button(action: {
+                                self.postToDelete = post
+                                self.showDeleteDialog = true
+                            }) {
+                                Image(systemName: "trash")
+                                    .foregroundColor(.red)
+                            }
                         }
                         
                         Text(post.content)
