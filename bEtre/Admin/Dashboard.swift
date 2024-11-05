@@ -3,6 +3,14 @@ import FirebaseDatabase
 import Charts
 import FirebaseAuth
 
+struct Violation: Identifiable {
+    let id: String
+    let reason: String
+    let timestamp: TimeInterval
+    let userId: String
+    var username: String
+}
+
 struct TrendDataPoint: Identifiable {
     let id = UUID()
     let date: String
@@ -55,7 +63,7 @@ struct ReportsBarChart: View {
             Chart {
                 ForEach(data) { dataPoint in
                     BarMark(
-                        x: .value("Date", dataPoint.date),
+                        x: .value("Type", dataPoint.type.rawValue),
                         y: .value("Count", dataPoint.count)
                     )
                     .foregroundStyle(by: .value("Type", dataPoint.type.rawValue))
@@ -63,14 +71,12 @@ struct ReportsBarChart: View {
                 }
             }
             .frame(height: 300)
-            .chartXAxis(.hidden)
             .padding()
         }
         .padding(.leading, 20)
         .padding(.top, 20)
     }
 }
-
 
 struct DashboardView: View {
     @State private var totalUsers: Int = 0
@@ -90,9 +96,12 @@ struct DashboardView: View {
     @State private var totalPosts: Int = 0
     @State private var totalLikes: Int = 0
     @State private var totalComments: Int = 0
+    @State private var reportedComments: [CommentDisplayData] = []
     
     @State private var reportDataPoints: [ReportDataPoint] = []
     private let databaseRef = Database.database().reference()
+    
+    @State private var violations: [Violation] = []
     
     var body: some View {
         NavigationStack(path: $navigationPath) {
@@ -176,6 +185,7 @@ struct DashboardView: View {
                                 fetchTotalPosts()
                                 fetchTotalLikes()
                                 fetchTotalComments()
+                                
                             }
                         }
                         
@@ -234,12 +244,102 @@ struct DashboardView: View {
                             fetchReportData()
                         }
                     
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("Violation History")
+                            .font(.headline)
+                            .padding(.top)
+                        
+                        if violations.isEmpty {
+                            Text("No recent violations")
+                                .font(.subheadline)
+                                .foregroundColor(.gray)
+                        } else {
+                            ForEach(violations) { violation in
+                                HStack {
+                                    VStack(alignment: .leading) {
+                                        Text("Username: \(violation.username)")
+                                            .font(.subheadline)
+                                            .foregroundColor(.secondary)
+                                        Text("Reason: \(violation.reason)")
+                                            .font(.body)
+                                            .foregroundColor(.primary)
+                                        Text("Date: \(Date(timeIntervalSince1970: violation.timestamp), formatter: dateFormatter)")
+                                            .font(.caption)
+                                            .foregroundColor(.gray)
+                                    }
+                                    Spacer()
+                                }
+                                .padding(.vertical, 8)
+                                .background(Color(.systemGray6))
+                                .cornerRadius(8)
+                            }
+                        }
+                    }
+                    .padding(.horizontal)
+                    .onAppear(perform: fetchViolations)
+                    
                     Spacer()
+                    
+                    
                 }
             }
             .navigationDestination(for: String.self) { userId in
                 AdminEditUser(userId: userId)
             }
+        }
+    }
+    
+    private var dateFormatter: DateFormatter {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .none
+        return formatter
+    }
+    
+    private func fetchViolations() {
+        databaseRef.child("warnings").observeSingleEvent(of: .value) { snapshot in
+            var loadedViolations: [Violation] = []
+            let dispatchGroup = DispatchGroup() // Use DispatchGroup to wait for all username fetches to complete
+
+            for userSnapshot in snapshot.children {
+                if let userSnapshot = userSnapshot as? DataSnapshot {
+                    for warningSnapshot in userSnapshot.children {
+                        if let warningData = warningSnapshot as? DataSnapshot,
+                           let data = warningData.value as? [String: Any],
+                           let reason = data["reason"] as? String,
+                           let timestamp = data["timestamp"] as? TimeInterval,
+                           let userId = data["userId"] as? String {
+                               
+                            // Start fetching username for this userId
+                            dispatchGroup.enter()
+                            fetchUsername(for: userId) { username in
+                                let violation = Violation(
+                                    id: warningData.key,
+                                    reason: reason,
+                                    timestamp: timestamp,
+                                    userId: userId,
+                                    username: username // Assign fetched username
+                                )
+                                loadedViolations.append(violation)
+                                dispatchGroup.leave()
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Once all usernames are fetched, update the violations list on the main thread
+            dispatchGroup.notify(queue: .main) {
+                self.violations = loadedViolations.sorted(by: { $0.timestamp > $1.timestamp })
+            }
+        }
+    }
+    
+    private func fetchUsername(for userId: String, completion: @escaping (String) -> Void) {
+        let userRef = databaseRef.child("users").child(userId)
+        userRef.observeSingleEvent(of: .value) { snapshot in
+            let username = (snapshot.value as? [String: Any])?["username"] as? String ?? "Unknown User"
+            completion(username)
         }
     }
     
@@ -310,6 +410,7 @@ struct DashboardView: View {
         }
     }
     
+    
     private func fetchReportProfiles() {
         databaseRef.child("reported_profiles").observe(.value) { snapshot in
             var profileReportsByDate: [String: Int] = [:]
@@ -356,56 +457,79 @@ struct DashboardView: View {
         databaseRef.child("likes").observeSingleEvent(of: .value) { snapshot in
             var likesCount = 0
             for postSnapshot in snapshot.children {
-                if let post = postSnapshot as? DataSnapshot {
-                    likesCount += Int(post.childrenCount)
+                if let postSnapshot = postSnapshot as? DataSnapshot {
+                    let usersSnapshot = postSnapshot.childSnapshot(forPath: "users")
+                    likesCount += Int(usersSnapshot.childrenCount)
                 }
             }
             self.totalLikes = likesCount
         }
     }
     
+    
     private func fetchTotalComments() {
         databaseRef.child("comments").observeSingleEvent(of: .value) { snapshot in
-            var commentsCount = 0
-            for case let postSnapshot as DataSnapshot in snapshot.children {
-                commentsCount += Int(postSnapshot.childrenCount)
-            }
-            self.totalComments = commentsCount
+            self.totalComments = Int(snapshot.childrenCount)
         }
     }
     
-    
-    
     private func fetchTotalReportedUsers() {
         var uniqueReportedUserIds = Set<String>()
+        let dispatchGroup = DispatchGroup()
         
-        // Fetch unique reported users from the "reports" node
+        // Fetch reported users from "reports" node (for reported posts)
         databaseRef.child("reports").observeSingleEvent(of: .value) { snapshot in
-            for postSnapshot in snapshot.children {
-                if let postSnapshot = postSnapshot as? DataSnapshot {
-                    for userSnapshot in postSnapshot.children {
-                        if let userSnapshot = userSnapshot as? DataSnapshot {
-                            uniqueReportedUserIds.insert(userSnapshot.key)
-                        }
-                    }
+            for child in snapshot.children {
+                if let reportSnapshot = child as? DataSnapshot,
+                   let reportData = reportSnapshot.value as? [String: Any],
+                   let reportedUserId = reportData["reportedBy"] as? String {
+                    uniqueReportedUserIds.insert(reportedUserId)
                 }
             }
             
-            // Fetch reported users from the "comments" node
-            databaseRef.child("comments").observeSingleEvent(of: .value) { commentsSnapshot in
-                for postSnapshot in commentsSnapshot.children {
-                    if let postSnapshot = postSnapshot as? DataSnapshot {
-                        for commentSnapshot in postSnapshot.children {
-                            if let commentData = (commentSnapshot as? DataSnapshot)?.value as? [String: Any],
-                               let reportedUserId = commentData["reportedCommentUserId"] as? String {
-                                uniqueReportedUserIds.insert(reportedUserId)
-                            }
-                        }
+            // Fetch reported users from "report_comments" node (for reported comments)
+            self.databaseRef.child("report_comments").observeSingleEvent(of: .value) { snapshot in
+                for child in snapshot.children {
+                    if let reportSnapshot = child as? DataSnapshot,
+                       let reportData = reportSnapshot.value as? [String: Any],
+                       let reportedUserId = reportData["reportedCommentUserId"] as? String {
+                        uniqueReportedUserIds.insert(reportedUserId)
                     }
                 }
                 
-                // Confirm each ID in uniqueReportedUserIds with the "users" node
-                self.validateUserIds(Array(uniqueReportedUserIds))
+                // Fetch reported users from "reported_profiles" node
+                self.databaseRef.child("reported_profiles").observeSingleEvent(of: .value) { snapshot in
+                    for child in snapshot.children {
+                        if let reportProfile = child as? DataSnapshot,
+                           let reportData = reportProfile.value as? [String: Any],
+                           let reportedUserId = reportData["reportedUserId"] as? String {
+                            uniqueReportedUserIds.insert(reportedUserId)
+                        }
+                    }
+                    
+                    // Validate existence of each unique user ID in the "users" node
+                    var validReportedUserCount = 0
+                    for userId in uniqueReportedUserIds {
+                        dispatchGroup.enter()
+                        self.databaseRef.child("users").child(userId).observeSingleEvent(of: .value) { snapshot in
+                            // Log the current user ID being checked for debugging
+                            print("Checking userId: \(userId)")
+                            if snapshot.exists() {
+                                print("User exists: \(userId)")
+                                validReportedUserCount += 1
+                            } else {
+                                print("User does not exist: \(userId)")
+                            }
+                            dispatchGroup.leave()
+                        }
+                    }
+                    
+                    // Update totalReportedUsers after all checks are complete
+                    dispatchGroup.notify(queue: .main) {
+                        self.totalReportedUsers = validReportedUserCount
+                        print("Total valid reported users: \(self.totalReportedUsers)")
+                    }
+                }
             }
         }
     }
@@ -582,6 +706,52 @@ struct DashboardView: View {
         self.searchText = ""
         self.navigationPath.append(user.id)
     }
+    
+    private func fetchReportedComments() {
+        databaseRef.child("report_comments").observeSingleEvent(of: .value) { snapshot in
+            var commentsList: [CommentDisplayData] = []
+            let dispatchGroup = DispatchGroup()
+            
+            for child in snapshot.children {
+                if let childSnapshot = child as? DataSnapshot,
+                   let reportData = childSnapshot.value as? [String: Any] {
+                    
+                    let commentId = reportData["commentId"] as? String ?? "Missing commentId"
+                    let postId = reportData["postId"] as? String ?? "Missing postId"
+                    let content = reportData["content"] as? String ?? "Missing content"
+                    let reportedById = reportData["reportedBy"] as? String ?? "Missing reportedBy"
+                    let reportedCommentUserId = reportData["reportedCommentUserId"] as? String ?? "Missing reportedCommentUserId"
+                    let reason = reportData["reason"] as? String ?? "Missing reason"
+                    
+                    print("Debug Reported Comment - ID: \(commentId), Post ID: \(postId), Content: \(content), Reason: \(reason)")
+                    
+                    // Continue with fetching usernames, assuming all fields exist
+                    dispatchGroup.enter()
+                    
+                    fetchUsernames(commenterId: reportedCommentUserId, postOwnerId: reportedById) { commenterName, postOwnerName in
+                        let comment = CommentDisplayData(
+                            id: commentId,
+                            commenterName: commenterName,
+                            content: content,
+                            postOwnerName: postOwnerName,
+                            reason: reason
+                        )
+                        commentsList.append(comment)
+                        dispatchGroup.leave()
+                    }
+                }
+            }
+            
+            
+            // Update reportedComments only after all usernames are fetched
+            dispatchGroup.notify(queue: .main) {
+                self.reportedComments = commentsList
+                print("Total reported comments fetched: \(self.reportedComments.count)")
+            }
+        }
+    }
+    
+    
 }
 
 // Bar Chart View for Location Data
@@ -608,29 +778,6 @@ struct BarChart: View {
     }
 }
 
-// Comment View for Displaying Each Comment Nicely
-struct CommentAdminView: View {
-    var commentData: CommentDisplayData
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 5) {
-            Text("\(commentData.commenterName) commented to \(commentData.postOwnerName)")
-                .font(.subheadline)
-                .foregroundColor(.secondary)
-            
-            Text("\"\(commentData.content)\"")
-                .font(.body)
-                .foregroundColor(.primary)
-                .padding(.leading, 10)
-        }
-        .padding(10)
-        .background(Color(.systemGray6))
-        .cornerRadius(8)
-        .shadow(radius: 2)
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-}
-
 // Model
 struct LocationData: Identifiable {
     var id = UUID()
@@ -643,7 +790,9 @@ struct CommentDisplayData: Identifiable {
     var commenterName: String
     var content: String
     var postOwnerName: String
+    var reason: String = ""
 }
+
 // Gender Pie Chart View
 struct GenderPieChart: View {
     var malePercentage: Double
