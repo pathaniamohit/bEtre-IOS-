@@ -695,34 +695,6 @@ struct BarChart: View {
     }
 }
 
-struct CommentAdminView: View {
-    var commentData: CommentDisplayData
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 5) {
-            Text("\(commentData.commenterName) commented to \(commentData.postOwnerName)")
-                .font(.subheadline)
-                .foregroundColor(.secondary)
-            
-            Text("\"\(commentData.content)\"")
-                .font(.body)
-                .foregroundColor(.primary)
-                .padding(.leading, 10)
-            
-            Text("Reason: \(commentData.reason)")
-                .font(.footnote)
-                .foregroundColor(.red)
-                .padding(.top, 5)
-        }
-        .padding(10)
-        .background(Color(.systemGray6))
-        .cornerRadius(8)
-        .shadow(radius: 2)
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-}
-
-
 // Model
 struct LocationData: Identifiable {
     var id = UUID()
