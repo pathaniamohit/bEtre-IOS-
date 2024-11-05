@@ -89,50 +89,88 @@ struct ReportedUsersView: View {
     }
     
     private func fetchReportedUsers() {
-        databaseRef.child("reports").observeSingleEvent(of: .value) { snapshot in
-            var reportedUserIds: Set<String> = []
-            
-            // Iterate through reports to gather all unique reported user IDs
-            for report in snapshot.children {
-                if let reportSnapshot = report as? DataSnapshot {
-                    for child in reportSnapshot.children {
-                        if let userSnapshot = child as? DataSnapshot {
-                            reportedUserIds.insert(userSnapshot.key)
-                        }
+            fetchFromReports { reportedUserIds in
+                fetchFromReportComments(existingUserIds: reportedUserIds) { updatedUserIds in
+                    fetchFromReportedProfiles(existingUserIds: updatedUserIds) { finalUserIds in
+                        print("Unique user IDs before fetching user data: \(finalUserIds)")
+                        fetchUserData(for: Array(finalUserIds))
                     }
                 }
             }
-            
-            // Fetch user data for each reported user
-            fetchUserData(for: Array(reportedUserIds))
         }
-    }
-    
-    private func fetchUserData(for userIds: [String]) {
-        var loadedUsers: [AllReportedUser] = []
         
-        let userGroup = DispatchGroup() // To manage asynchronous fetch completion
-        
-        for userId in userIds {
-            userGroup.enter()
-            databaseRef.child("users").child(userId).observeSingleEvent(of: .value) { snapshot in
-                if let userData = snapshot.value as? [String: Any],
-                   let username = userData["username"] as? String,
-                   let email = userData["email"] as? String,
-                   let role = userData["role"] as? String {
-                    
-                    let user = AllReportedUser(id: userId, username: username, email: email, role: role)
-                    loadedUsers.append(user)
+        private func fetchFromReports(completion: @escaping (Set<String>) -> Void) {
+            var reportedUserIds = Set<String>()
+            
+            databaseRef.child("reports").observeSingleEvent(of: .value) { snapshot in
+                for report in snapshot.children {
+                    if let reportSnapshot = report as? DataSnapshot,
+                       let reportData = reportSnapshot.value as? [String: Any],
+                       let reportedUserId = reportData["reportedBy"] as? String {
+                        reportedUserIds.insert(reportedUserId)
+                    }
                 }
-                userGroup.leave()
+                print("User IDs from reports node: \(reportedUserIds)")
+                completion(reportedUserIds)
             }
         }
         
-        userGroup.notify(queue: .main) {
-            // Sort suspended users to the top and update the state
-            self.reportedUsers = loadedUsers.sorted { $0.role == "suspended" && $1.role != "suspended" }
+        private func fetchFromReportComments(existingUserIds: Set<String>, completion: @escaping (Set<String>) -> Void) {
+            var reportedUserIds = existingUserIds
+            
+            databaseRef.child("report_comments").observeSingleEvent(of: .value) { snapshot in
+                for reportComment in snapshot.children {
+                    if let reportData = (reportComment as? DataSnapshot)?.value as? [String: Any],
+                       let reportedUserId = reportData["reportedCommentUserId"] as? String {
+                        reportedUserIds.insert(reportedUserId)
+                    }
+                }
+                print("User IDs after adding from report_comments node: \(reportedUserIds)")
+                completion(reportedUserIds)
+            }
         }
-    }
+        
+        private func fetchFromReportedProfiles(existingUserIds: Set<String>, completion: @escaping (Set<String>) -> Void) {
+            var reportedUserIds = existingUserIds
+            
+            databaseRef.child("reported_profiles").observeSingleEvent(of: .value) { snapshot in
+                for reportProfile in snapshot.children {
+                    if let reportData = (reportProfile as? DataSnapshot)?.value as? [String: Any],
+                       let reportedUserId = reportData["reportedUserId"] as? String {
+                        reportedUserIds.insert(reportedUserId)
+                    }
+                }
+                print("Final user IDs after adding from reported_profiles node: \(reportedUserIds)")
+                completion(reportedUserIds)
+            }
+        }
+        
+        private func fetchUserData(for userIds: [String]) {
+            var loadedUsers: [AllReportedUser] = []
+            let userGroup = DispatchGroup()
+            
+            for userId in userIds {
+                userGroup.enter()
+                databaseRef.child("users").child(userId).observeSingleEvent(of: .value) { snapshot in
+                    print("Fetching data for userId: \(userId)")
+                    if let userData = snapshot.value as? [String: Any],
+                       let username = userData["username"] as? String,
+                       let email = userData["email"] as? String,
+                       let role = userData["role"] as? String {
+                        let user = AllReportedUser(id: userId, username: username, email: email, role: role)
+                        loadedUsers.append(user)
+                    } else {
+                        print("User does not exist in 'users' node: \(userId)")
+                    }
+                    userGroup.leave()
+                }
+            }
+            
+            userGroup.notify(queue: .main) {
+                self.reportedUsers = loadedUsers.sorted { $0.role == "suspended" && $1.role != "suspended" }
+                print("Total valid reported users displayed: \(self.reportedUsers.count)")
+            }
+        }
     
     private func deleteUser() {
         guard let user = selectedUser else { return }

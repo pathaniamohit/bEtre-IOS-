@@ -55,7 +55,7 @@ struct ReportsBarChart: View {
             Chart {
                 ForEach(data) { dataPoint in
                     BarMark(
-                        x: .value("Date", dataPoint.date),
+                        x: .value("Type", dataPoint.type.rawValue),
                         y: .value("Count", dataPoint.count)
                     )
                     .foregroundStyle(by: .value("Type", dataPoint.type.rawValue))
@@ -63,14 +63,12 @@ struct ReportsBarChart: View {
                 }
             }
             .frame(height: 300)
-            .chartXAxis(.hidden)
             .padding()
         }
         .padding(.leading, 20)
         .padding(.top, 20)
     }
 }
-
 
 struct DashboardView: View {
     @State private var totalUsers: Int = 0
@@ -90,6 +88,7 @@ struct DashboardView: View {
     @State private var totalPosts: Int = 0
     @State private var totalLikes: Int = 0
     @State private var totalComments: Int = 0
+    @State private var reportedComments: [CommentDisplayData] = []
     
     @State private var reportDataPoints: [ReportDataPoint] = []
     private let databaseRef = Database.database().reference()
@@ -310,6 +309,7 @@ struct DashboardView: View {
         }
     }
     
+    
     private func fetchReportProfiles() {
         databaseRef.child("reported_profiles").observe(.value) { snapshot in
             var profileReportsByDate: [String: Int] = [:]
@@ -356,56 +356,79 @@ struct DashboardView: View {
         databaseRef.child("likes").observeSingleEvent(of: .value) { snapshot in
             var likesCount = 0
             for postSnapshot in snapshot.children {
-                if let post = postSnapshot as? DataSnapshot {
-                    likesCount += Int(post.childrenCount)
+                if let postSnapshot = postSnapshot as? DataSnapshot {
+                    let usersSnapshot = postSnapshot.childSnapshot(forPath: "users")
+                    likesCount += Int(usersSnapshot.childrenCount)
                 }
             }
             self.totalLikes = likesCount
         }
     }
     
+    
     private func fetchTotalComments() {
         databaseRef.child("comments").observeSingleEvent(of: .value) { snapshot in
-            var commentsCount = 0
-            for case let postSnapshot as DataSnapshot in snapshot.children {
-                commentsCount += Int(postSnapshot.childrenCount)
-            }
-            self.totalComments = commentsCount
+            self.totalComments = Int(snapshot.childrenCount)
         }
     }
     
-    
-    
     private func fetchTotalReportedUsers() {
         var uniqueReportedUserIds = Set<String>()
+        let dispatchGroup = DispatchGroup()
         
-        // Fetch unique reported users from the "reports" node
+        // Fetch reported users from "reports" node (for reported posts)
         databaseRef.child("reports").observeSingleEvent(of: .value) { snapshot in
-            for postSnapshot in snapshot.children {
-                if let postSnapshot = postSnapshot as? DataSnapshot {
-                    for userSnapshot in postSnapshot.children {
-                        if let userSnapshot = userSnapshot as? DataSnapshot {
-                            uniqueReportedUserIds.insert(userSnapshot.key)
-                        }
-                    }
+            for child in snapshot.children {
+                if let reportSnapshot = child as? DataSnapshot,
+                   let reportData = reportSnapshot.value as? [String: Any],
+                   let reportedUserId = reportData["reportedBy"] as? String {
+                    uniqueReportedUserIds.insert(reportedUserId)
                 }
             }
             
-            // Fetch reported users from the "comments" node
-            databaseRef.child("comments").observeSingleEvent(of: .value) { commentsSnapshot in
-                for postSnapshot in commentsSnapshot.children {
-                    if let postSnapshot = postSnapshot as? DataSnapshot {
-                        for commentSnapshot in postSnapshot.children {
-                            if let commentData = (commentSnapshot as? DataSnapshot)?.value as? [String: Any],
-                               let reportedUserId = commentData["reportedCommentUserId"] as? String {
-                                uniqueReportedUserIds.insert(reportedUserId)
-                            }
-                        }
+            // Fetch reported users from "report_comments" node (for reported comments)
+            self.databaseRef.child("report_comments").observeSingleEvent(of: .value) { snapshot in
+                for child in snapshot.children {
+                    if let reportSnapshot = child as? DataSnapshot,
+                       let reportData = reportSnapshot.value as? [String: Any],
+                       let reportedUserId = reportData["reportedCommentUserId"] as? String {
+                        uniqueReportedUserIds.insert(reportedUserId)
                     }
                 }
                 
-                // Confirm each ID in uniqueReportedUserIds with the "users" node
-                self.validateUserIds(Array(uniqueReportedUserIds))
+                // Fetch reported users from "reported_profiles" node
+                self.databaseRef.child("reported_profiles").observeSingleEvent(of: .value) { snapshot in
+                    for child in snapshot.children {
+                        if let reportProfile = child as? DataSnapshot,
+                           let reportData = reportProfile.value as? [String: Any],
+                           let reportedUserId = reportData["reportedUserId"] as? String {
+                            uniqueReportedUserIds.insert(reportedUserId)
+                        }
+                    }
+                    
+                    // Validate existence of each unique user ID in the "users" node
+                    var validReportedUserCount = 0
+                    for userId in uniqueReportedUserIds {
+                        dispatchGroup.enter()
+                        self.databaseRef.child("users").child(userId).observeSingleEvent(of: .value) { snapshot in
+                            // Log the current user ID being checked for debugging
+                            print("Checking userId: \(userId)")
+                            if snapshot.exists() {
+                                print("User exists: \(userId)")
+                                validReportedUserCount += 1
+                            } else {
+                                print("User does not exist: \(userId)")
+                            }
+                            dispatchGroup.leave()
+                        }
+                    }
+                    
+                    // Update totalReportedUsers after all checks are complete
+                    dispatchGroup.notify(queue: .main) {
+                        self.totalReportedUsers = validReportedUserCount
+                        print("Total valid reported users: \(self.totalReportedUsers)")
+                    }
+                }
             }
         }
     }
@@ -582,6 +605,52 @@ struct DashboardView: View {
         self.searchText = ""
         self.navigationPath.append(user.id)
     }
+    
+    private func fetchReportedComments() {
+        databaseRef.child("report_comments").observeSingleEvent(of: .value) { snapshot in
+            var commentsList: [CommentDisplayData] = []
+            let dispatchGroup = DispatchGroup()
+            
+            for child in snapshot.children {
+                if let childSnapshot = child as? DataSnapshot,
+                   let reportData = childSnapshot.value as? [String: Any] {
+                    
+                    let commentId = reportData["commentId"] as? String ?? "Missing commentId"
+                    let postId = reportData["postId"] as? String ?? "Missing postId"
+                    let content = reportData["content"] as? String ?? "Missing content"
+                    let reportedById = reportData["reportedBy"] as? String ?? "Missing reportedBy"
+                    let reportedCommentUserId = reportData["reportedCommentUserId"] as? String ?? "Missing reportedCommentUserId"
+                    let reason = reportData["reason"] as? String ?? "Missing reason"
+                    
+                    print("Debug Reported Comment - ID: \(commentId), Post ID: \(postId), Content: \(content), Reason: \(reason)")
+                    
+                    // Continue with fetching usernames, assuming all fields exist
+                    dispatchGroup.enter()
+                    
+                    fetchUsernames(commenterId: reportedCommentUserId, postOwnerId: reportedById) { commenterName, postOwnerName in
+                        let comment = CommentDisplayData(
+                            id: commentId,
+                            commenterName: commenterName,
+                            content: content,
+                            postOwnerName: postOwnerName,
+                            reason: reason
+                        )
+                        commentsList.append(comment)
+                        dispatchGroup.leave()
+                    }
+                }
+            }
+
+            
+            // Update reportedComments only after all usernames are fetched
+            dispatchGroup.notify(queue: .main) {
+                self.reportedComments = commentsList
+                print("Total reported comments fetched: \(self.reportedComments.count)")
+            }
+        }
+    }
+
+    
 }
 
 // Bar Chart View for Location Data
@@ -608,29 +677,6 @@ struct BarChart: View {
     }
 }
 
-// Comment View for Displaying Each Comment Nicely
-struct CommentAdminView: View {
-    var commentData: CommentDisplayData
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 5) {
-            Text("\(commentData.commenterName) commented to \(commentData.postOwnerName)")
-                .font(.subheadline)
-                .foregroundColor(.secondary)
-            
-            Text("\"\(commentData.content)\"")
-                .font(.body)
-                .foregroundColor(.primary)
-                .padding(.leading, 10)
-        }
-        .padding(10)
-        .background(Color(.systemGray6))
-        .cornerRadius(8)
-        .shadow(radius: 2)
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-}
-
 // Model
 struct LocationData: Identifiable {
     var id = UUID()
@@ -643,7 +689,9 @@ struct CommentDisplayData: Identifiable {
     var commenterName: String
     var content: String
     var postOwnerName: String
+    var reason: String = ""
 }
+
 // Gender Pie Chart View
 struct GenderPieChart: View {
     var malePercentage: Double

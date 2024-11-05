@@ -23,10 +23,10 @@ struct InboxAdminView: View {
             }
             .onAppear {
                 fetchAdminUserId()
-                observeReports()
+                observeReportedComments()
             }
-            .navigationDestination(for: String.self) { postOwnerId in
-                UserProfileView(userId: postOwnerId)
+            .navigationDestination(for: String.self) { userId in
+                UserProfileView(userId: userId)
             }
         }
     }
@@ -39,70 +39,43 @@ struct InboxAdminView: View {
         }
     }
     
-    private func observeReports() {
-        databaseRef.child("reports").observe(.value) { snapshot in
+    private func observeReportedComments() {
+        databaseRef.child("report_comments").observe(.value) { snapshot in
             var newReports: [ReportData] = []
             
-            for postSnapshot in snapshot.children {
-                if let postSnapshot = postSnapshot as? DataSnapshot {
-                    let postId = postSnapshot.key
+            for child in snapshot.children {
+                if let childSnapshot = child as? DataSnapshot,
+                   let reportData = childSnapshot.value as? [String: Any] {
                     
-                    for reportSnapshot in postSnapshot.children {
-                        if let reportSnapshot = reportSnapshot as? DataSnapshot,
-                           let content = reportSnapshot.value as? String {
-                            let reporterId = reportSnapshot.key
-                            
-                            fetchUsernames(postId: postId, reporterId: reporterId) { postOwnerName, reporterName, postOwnerId, warningCount in
-                                let report = ReportData(
-                                    id: "\(postId)-\(reporterId)",
-                                    postId: postId,
-                                    content: content,
-                                    postOwnerId: postOwnerId,
-                                    postOwnerName: postOwnerName,
-                                    reporterName: reporterName,
-                                    warningCount: warningCount
-                                )
-                                newReports.append(report)
-                                self.reports = newReports
-                            }
-                        }
-                    }
+                    let commentId = childSnapshot.key
+                    let postId = reportData["postId"] as? String ?? "Unknown Post"
+                    let content = reportData["content"] as? String ?? "No content"
+                    let reportedById = reportData["reportedBy"] as? String ?? "Unknown Reporter"
+                    let reportedCommentUserId = reportData["reportedCommentUserId"] as? String ?? "Unknown User"
+                    let reason = reportData["reason"] as? String ?? "No reason provided"
+                    
+                    let report = ReportData(
+                        id: commentId,
+                        postId: postId,
+                        content: content,
+                        reportedById: reportedById,
+                        reportedCommentUserId: reportedCommentUserId,
+                        reason: reason
+                    )
+                    newReports.append(report)
                 }
             }
-        }
-    }
-
-    private func fetchUsernames(postId: String, reporterId: String, completion: @escaping (String, String, String, Int) -> Void) {
-        databaseRef.child("posts").child(postId).observeSingleEvent(of: .value) { snapshot in
-            let postOwnerId = (snapshot.value as? [String: Any])?["userId"] as? String ?? "Unknown User"
-            let userRef = databaseRef.child("users")
-            
-            userRef.child(postOwnerId).observeSingleEvent(of: .value) { ownerSnapshot in
-                let postOwnerName = (ownerSnapshot.value as? [String: Any])?["username"] as? String ?? "Unknown User"
-                let warningCount = (ownerSnapshot.value as? [String: Any])?["count_warning"] as? Int ?? 0
-                
-                userRef.child(reporterId).observeSingleEvent(of: .value) { reporterSnapshot in
-                    let reporterName = (reporterSnapshot.value as? [String: Any])?["username"] as? String ?? "Unknown User"
-                    completion(postOwnerName, reporterName, postOwnerId, warningCount)
-                }
-            }
+            self.reports = newReports
         }
     }
     
     private func removeReport(reportId: String) {
-        self.reports.removeAll { $0.id == reportId }
-        
-        // Delete report entry from Firebase
-        let ids = reportId.split(separator: "-")
-        if ids.count == 2 {
-            let postId = String(ids[0])
-            let reporterId = String(ids[1])
-            databaseRef.child("reports").child(postId).child(reporterId).removeValue { error, _ in
-                if let error = error {
-                    print("Error deleting report: \(error)")
-                } else {
-                    print("Report \(reportId) successfully removed.")
-                }
+        databaseRef.child("report_comments").child(reportId).removeValue { error, _ in
+            if let error = error {
+                print("Error deleting report: \(error)")
+            } else {
+                print("Report \(reportId) successfully removed.")
+                self.reports.removeAll { $0.id == reportId }
             }
         }
     }
@@ -113,29 +86,28 @@ struct ReportData: Identifiable {
     var id: String
     var postId: String
     var content: String
-    var postOwnerId: String
-    var postOwnerName: String
-    var reporterName: String
-    var warningCount: Int
+    var reportedById: String
+    var reportedCommentUserId: String
+    var reason: String
 }
 
-// Custom view for each report row with warning dialog
+// Custom view for each report row with admin options
 struct ReportRowView: View {
     var report: ReportData
     @Binding var navigationPath: NavigationPath
-    @State private var showOptions = false
     @State private var showWarningDialog = false
     @State private var warningMessage = ""
+    private let databaseRef = Database.database().reference()
     var adminUserId: String?
     var onRemoveReport: (String) -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 5) {
-            Text("Post Owner: \(report.postOwnerName)")
+            Text("Comment Owner: \(report.reportedCommentUserId)")
                 .font(.headline)
                 .foregroundColor(.blue)
             
-            Text("Reporter: \(report.reporterName)")
+            Text("Reported By: \(report.reportedById)")
                 .font(.subheadline)
                 .foregroundColor(.secondary)
             
@@ -144,18 +116,25 @@ struct ReportRowView: View {
                 .foregroundColor(.primary)
                 .padding(.leading, 10)
             
+            Text("Reason: \(report.reason)")
+                .font(.footnote)
+                .foregroundColor(.red)
+                .padding(.top, 5)
+            
             HStack {
                 Spacer()
                 Menu {
-                    Button("See Profile") {
-                        navigationPath.append(report.postOwnerId)
-                    }
-                    Button("See Post") { /* Handle view post */ }
                     Button("Suspend User") {
-                        suspendUser(userId: report.postOwnerId)// Remove report after suspension
+                        suspendUser(userId: report.reportedCommentUserId)
+                        onRemoveReport(report.id)
                     }
                     Button("Give Warning", action: { showWarningDialog = true })
-                        .disabled(report.warningCount >= 2)
+                    Button("Reviewed") {
+                        markCommentAsReviewed(report)
+                    }
+                    Button("Delete Comment") {
+                        deleteComment(report)
+                    }
                 } label: {
                     Image(systemName: "ellipsis")
                         .font(.system(size: 20))
@@ -168,36 +147,20 @@ struct ReportRowView: View {
         .background(Color(.systemGray6))
         .cornerRadius(8)
         .shadow(radius: 2)
-        .overlay(
-            RoundedRectangle(cornerRadius: 8)
-                .stroke(getBorderColor(for: report.warningCount), lineWidth: 2)
-        )
         .sheet(isPresented: $showWarningDialog) {
             WarningDialog(
                 warningMessage: $warningMessage,
                 onSend: {
-                    giveWarning(message: warningMessage)
-                    onRemoveReport(report.id) // Remove report after sending a warning
+                    giveWarning(message: warningMessage, commentOwnerId: report.reportedCommentUserId)
+                    onRemoveReport(report.id)
                     showWarningDialog = false
                 }
             )
         }
     }
     
-    private func getBorderColor(for warningCount: Int) -> Color {
-        switch warningCount {
-        case 2:
-            return .red
-        case 1:
-            return .orange
-        default:
-            return .yellow
-        }
-    }
-    
     private func suspendUser(userId: String) {
-        let userRef = Database.database().reference().child("users").child(userId)
-        userRef.updateChildValues(["role": "suspended"]) { error, _ in
+        databaseRef.child("users").child(userId).updateChildValues(["role": "suspended"]) { error, _ in
             if let error = error {
                 print("Error suspending user: \(error)")
             } else {
@@ -206,114 +169,82 @@ struct ReportRowView: View {
         }
     }
     
-    private func giveWarning(message: String) {
-        guard let adminId = adminUserId else {
-            print("Error: Admin ID is missing.")
-            return
+    private func giveWarning(message: String, commentOwnerId: String) {
+        let warningRef = databaseRef.child("warnings").child(commentOwnerId).childByAutoId()
+        let warningData: [String: Any] = [
+            "userId": commentOwnerId,
+            "reason": message,
+            "timestamp": Date().timeIntervalSince1970
+        ]
+        
+        warningRef.setValue(warningData) { error, _ in
+            if let error = error {
+                print("Failed to issue warning: \(error.localizedDescription)")
+            } else {
+                print("Warning issued to user \(commentOwnerId)")
+            }
         }
-        
-        let userRef = Database.database().reference().child("users").child(report.postOwnerId)
-        
-        // Increment the warning count
-        userRef.runTransactionBlock { currentData in
-            var user = currentData.value as? [String: Any] ?? [:]
-            let currentWarningCount = user["count_warning"] as? Int ?? 0
-            user["count_warning"] = currentWarningCount + 1
-            currentData.value = user
-            return .success(withValue: currentData)
+    }
+    
+    private func markCommentAsReviewed(_ report: ReportData) {
+        databaseRef.child("report_comments").child(report.id).removeValue { error, _ in
+            if let error = error {
+                print("Error removing report: \(error.localizedDescription)")
+            } else {
+                onRemoveReport(report.id)
+                print("Report \(report.id) marked as reviewed.")
+            }
         }
-        
-        // Save the warning message in notifications
-        let notificationRef = Database.database().reference().child("notifications").child(report.postOwnerId).childByAutoId()
-        notificationRef.setValue([
-            "postId": report.postId,
-            "userId": adminId,
-            "type": "report",
-            "timestamp": Date().timeIntervalSince1970,
-            "content": message
-        ])
+    }
+    
+    private func deleteComment(_ report: ReportData) {
+        let commentsRef = databaseRef.child("comments").child(report.postId).child(report.id)
+        commentsRef.removeValue { error, _ in
+            if let error = error {
+                print("Error deleting comment: \(error.localizedDescription)")
+            } else {
+                onRemoveReport(report.id)
+                print("Comment \(report.id) deleted.")
+            }
+        }
     }
 }
+
 // Warning Dialog View
 struct WarningDialog: View {
     @Binding var warningMessage: String
     var onSend: () -> Void
-    
-    @State private var isGuideline1Checked = false
-    @State private var isGuideline2Checked = false
-    @State private var isGuideline3Checked = false
-    
-    
+
     var body: some View {
         VStack(spacing: 20) {
             Text("Send Warning")
                 .font(.headline)
             
+            TextField("Enter warning message", text: $warningMessage)
+                .textFieldStyle(RoundedBorderTextFieldStyle())
+                .padding()
             
-                Text("Guidelines : ")
-                    .font(.headline)
-                    .font(.system(size: 18))
-                
-                VStack(alignment: .leading) {
-                    Toggle("Respect community standards", isOn: $isGuideline1Checked)
-                        .toggleStyle(CheckboxToggleStyle())
-                    
-                    Toggle("Avoid offensive language", isOn: $isGuideline2Checked)
-                        .toggleStyle(CheckboxToggleStyle())
-                    
-                    Toggle("No spam or irrelevant content", isOn: $isGuideline3Checked)
-                        .toggleStyle(CheckboxToggleStyle())
+            HStack {
+                Button("Cancel") {
+                    warningMessage = ""
                 }
-                .padding()
+                .foregroundColor(.red)
                 
-                TextField("Enter warning message", text: $warningMessage)
-                    .textFieldStyle(RoundedBorderTextFieldStyle())
-                    .padding()
+                Spacer()
                 
-                HStack {
-                    Button("Cancel") {
-                        warningMessage = ""
-                    }
-                    .foregroundColor(.red)
-                    
-                    Spacer()
-                    
-                    Button("Send") {
-                        if isGuideline1Checked {
-                            warningMessage += "\n- Respect community standards"
-                        }
-                        if isGuideline2Checked {
-                            warningMessage += "\n- Avoid offensive language"
-                        }
-                        if isGuideline3Checked {
-                            warningMessage += "\n- No spam or irrelevant content"
-                        }
-                        onSend()
-                    }
-                   .disabled(warningMessage.isEmpty)
+                Button("Send") {
+                    onSend()
                 }
-                .padding()
+                .disabled(warningMessage.isEmpty)
             }
             .padding()
-            .background(Color.white)
-            .cornerRadius(10)
-            .shadow(radius: 10)
         }
+        .padding()
+        .background(Color.white)
+        .cornerRadius(10)
+        .shadow(radius: 10)
     }
-struct CheckboxToggleStyle: ToggleStyle {
-       func makeBody(configuration: Configuration) -> some View {
-           Button(action: {
-               configuration.isOn.toggle()
-           }) {
-               HStack {
-                   Image(systemName: configuration.isOn ? "checkmark.square" : "square")
-                       .foregroundColor(configuration.isOn ? .blue : .gray)
-                   configuration.label
-               }
-           }
-           .buttonStyle(PlainButtonStyle())
-       }
-   }
+}
 
 // Preview structure for testing
 struct InboxAdminView_Previews: PreviewProvider {

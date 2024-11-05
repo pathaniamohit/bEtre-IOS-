@@ -12,14 +12,21 @@ struct AdminPost: Identifiable {
     var userId: String
     var location: String
     var imageUrl: String
-    var isReported: Bool
     var countLike: Int
     var countComment: Int
-    var username: String = ""
-    var email: String = ""
-    var profileImageUrl: String = ""
-    var warningCount: Int = 0
-    var comments: [AdminComment] = []  // Embedded comments within the post model
+    var username: String
+    var email: String
+    var profileImageUrl: String
+    var comments: [AdminComment] = []
+}
+
+struct AdminComment: Identifiable {
+    var id: String
+    var content: String
+    var timestamp: TimeInterval
+    var userId: String
+    var username: String
+    var postId: String
 }
 
 struct ActivityView: View {
@@ -29,9 +36,13 @@ struct ActivityView: View {
     @State private var filteredLocations: [String] = []
     @State private var selectedPostID: String? = nil
     @State private var searchText: String = ""
-    @State private var showDeletePostDialog: Bool = false
-    @State private var postToDelete: AdminPost? = nil
-
+    @State private var showDeleteDialog: Bool = false
+    @State private var postToDelete: AdminPost?
+    @State private var showCommentsSheet = false
+    @State private var selectedPostId: String?
+    @State private var commentToDelete: AdminComment?
+    @State private var showDeleteCommentDialog: Bool = false
+    
     var body: some View {
         VStack {
             // Search bar with location suggestions
@@ -75,14 +86,91 @@ struct ActivityView: View {
                 }
             }
             
+            // Displaying posts with double-tap delete option
             ScrollView {
                 ForEach(filteredPosts) { post in
-                    VStack(alignment: .leading) {
-                        PostView(post: post)
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            if let url = URL(string: post.profileImageUrl) {
+                                WebImage(url: url)
+                                    .resizable()
+                                    .frame(width: 40, height: 40)
+                                    .clipShape(Circle())
+                            } else {
+                                Image(systemName: "person.circle.fill")
+                                    .resizable()
+                                    .frame(width: 40, height: 40)
+                            }
+                            
+                            VStack(alignment: .leading) {
+                                Text(post.username)
+                                    .font(.headline)
+                                Text(post.email)
+                                    .font(.caption)
+                                    .foregroundColor(.gray)
+                            }
+                            Spacer()
+                            
+                            // Delete icon
+                            Button(action: {
+                                self.postToDelete = post
+                                self.showDeleteDialog = true
+                            }) {
+                                Image(systemName: "trash")
+                                    .foregroundColor(.red)
+                            }
+                        }
                         
+                        Text(post.content)
+                            .font(.subheadline)
+                        
+                        if let url = URL(string: post.imageUrl) {
+                            WebImage(url: url)
+                                .resizable()
+                                .scaledToFill()
+                                .frame(height: 200)
+                                .clipped()
+                        }
+                        
+                        Text("Location: \(post.location)")
+                            .font(.caption)
+                            .foregroundColor(.gray)
+                        
+                        HStack {
+                            Image(systemName: "heart")
+                            Text("\(post.countLike)")
+                            Image(systemName: "message")
+                        }
+                        .foregroundColor(.gray)
+                        .padding(.bottom, 8)
+                        // Display Comments
+                        // Display Comments with Delete Icon
                         ForEach(post.comments) { comment in
-                            AdminCommentView(comment: comment)
-                                .padding(.leading, 16)
+                            VStack(alignment: .leading, spacing: 4) {
+                                HStack {
+                                    Text(comment.username)
+                                        .font(.headline)
+                                        .foregroundColor(.blue)
+                                    Spacer()
+                                    Text(Date(timeIntervalSince1970: comment.timestamp), style: .time)
+                                        .font(.caption)
+                                        .foregroundColor(.gray)
+                                    Button(action: {
+                                        self.commentToDelete = comment
+                                        self.showDeleteCommentDialog = true
+                                    }) {
+                                        Image(systemName: "trash")
+                                            .foregroundColor(.red)
+                                    }
+                                }
+                                Text(comment.content)
+                                    .font(.body)
+                                    .foregroundColor(.primary)
+                            }
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 8)
+                            .background(Color(.systemGray6))
+                            .cornerRadius(8)
                         }
                     }
                     .padding()
@@ -90,120 +178,91 @@ struct ActivityView: View {
                         RoundedRectangle(cornerRadius: 10)
                             .fill(Color.white)
                             .shadow(radius: 5)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 10)
-                                    .stroke(post.isReported ? Color.red : Color.clear, lineWidth: 5)
-                            )
                     )
                     .padding(.horizontal)
                     .padding(.top, 8)
+                    .onTapGesture(count: 2) {
+                        self.postToDelete = post
+                        self.showDeleteDialog = true
+                    }
                 }
             }
             .onAppear(perform: loadPosts)
-            .alert(isPresented: $showDeletePostDialog) {
+            .alert(isPresented: $showDeleteDialog) {
                 Alert(
                     title: Text("Delete Post"),
-                    message: Text("Are you sure you want to delete this post?"),
+                    message: Text("Are you sure you want to delete this post and its image?"),
                     primaryButton: .destructive(Text("Delete"), action: deletePost),
+                    secondaryButton: .cancel()
+                )
+            }
+            .alert(isPresented: $showDeleteCommentDialog) {
+                Alert(
+                    title: Text("Delete Comment"),
+                    message: Text("Are you sure you want to delete this comment?"),
+                    primaryButton: .destructive(Text("Delete"), action: deleteComment),
                     secondaryButton: .cancel()
                 )
             }
         }
     }
-
-    private func deletePost() {
-        guard let post = postToDelete else { return }
-        let ref = Database.database().reference().child("posts").child(post.id)
-        ref.removeValue { error, _ in
-            if let error = error {
-                print("Failed to delete post: \(error.localizedDescription)")
-            } else {
-                self.posts.removeAll { $0.id == post.id }
-            }
-            postToDelete = nil
-        }
-    }
-
+    
     private func loadPosts() {
         let ref = Database.database().reference().child("posts")
         ref.observeSingleEvent(of: .value) { snapshot in
             var loadedPosts: [AdminPost] = []
-            var uniqueLocationSet: Set<String> = []
-
+            
             for child in snapshot.children {
                 if let snapshot = child as? DataSnapshot,
                    let postDict = snapshot.value as? [String: Any],
                    let userId = postDict["userId"] as? String {
                     
-                    checkUserExists(userId: userId) { exists in
-                        if exists {
-                            var post = AdminPost(
-                                id: snapshot.key,
-                                content: postDict["content"] as? String ?? "",
-                                timestamp: postDict["timestamp"] as? TimeInterval ?? 0,
-                                userId: userId,
-                                location: postDict["location"] as? String ?? "",
-                                imageUrl: postDict["imageUrl"] as? String ?? "",
-                                isReported: postDict["is_reported"] as? Bool ?? false,
-                                countLike: postDict["count_like"] as? Int ?? 0,
-                                countComment: postDict["count_comment"] as? Int ?? 0
-                            )
-
-                            uniqueLocationSet.insert(post.location)
-                            
-                            fetchUserData(for: userId) { username, email, profileImageUrl, warningCount in
-                                post.username = username
-                                post.email = email
-                                post.profileImageUrl = profileImageUrl
-                                post.warningCount = warningCount
-
-                                fetchComments(for: post.id) { comments in
-                                    post.comments = comments
-                                    
-                                    // Determine latest timestamp
-                                    let latestTimestamp = comments.map { $0.timestamp }.max() ?? post.timestamp
-                                    post.timestamp = latestTimestamp  // Update post's timestamp to latest comment
-
-                                    loadedPosts.append(post)
-                                    
-                                    // After fetching all posts, sort them by updated timestamps
-                                    if loadedPosts.count == snapshot.childrenCount {
-                                        self.posts = loadedPosts.sorted { $0.timestamp > $1.timestamp }
-                                        self.filteredPosts = self.posts
-                                        self.uniqueLocations = Array(uniqueLocationSet).sorted()
-                                    }
-                                }
-                            }
+                    fetchUserData(for: userId) { username, email, profileImageUrl in
+                        var post = AdminPost(
+                            id: snapshot.key,
+                            content: postDict["content"] as? String ?? "",
+                            timestamp: postDict["timestamp"] as? TimeInterval ?? 0,
+                            userId: userId,
+                            location: postDict["location"] as? String ?? "",
+                            imageUrl: postDict["imageUrl"] as? String ?? "",
+                            countLike: postDict["count_like"] as? Int ?? 0,
+                            countComment: postDict["count_comment"] as? Int ?? 0,
+                            username: username,
+                            email: email,
+                            profileImageUrl: profileImageUrl
+                        )
+                        
+                        // Load comments for each post
+                        fetchComments(for: post.id) { comments in
+                            post.comments = comments
+                            loadedPosts.append(post)
+                            self.posts = loadedPosts.sorted { $0.timestamp > $1.timestamp }
+                            self.filteredPosts = self.posts
                         }
                     }
                 }
             }
         }
     }
-
-    // Function to check if a user exists in the database
-    private func checkUserExists(userId: String, completion: @escaping (Bool) -> Void) {
-        let userRef = Database.database().reference().child("users").child(userId)
-        userRef.observeSingleEvent(of: .value) { snapshot in
-            completion(snapshot.exists())
-        }
-    }
-
     
     private func fetchComments(for postId: String, completion: @escaping ([AdminComment]) -> Void) {
-        let commentsRef = Database.database().reference().child("comments").child(postId)
+        let commentsRef = Database.database().reference().child("comments")
         commentsRef.observeSingleEvent(of: .value) { snapshot in
             var loadedComments: [AdminComment] = []
             
             for child in snapshot.children {
                 if let snapshot = child as? DataSnapshot,
-                   let commentData = snapshot.value as? [String: Any] {
+                   let commentData = snapshot.value as? [String: Any],
+                   let commentPostId = commentData["post_Id"] as? String,
+                   commentPostId == postId {
+                    
                     let comment = AdminComment(
                         id: snapshot.key,
                         content: commentData["content"] as? String ?? "",
                         timestamp: commentData["timestamp"] as? TimeInterval ?? 0,
                         userId: commentData["userId"] as? String ?? "",
-                        username: commentData["username"] as? String ?? "Anonymous"
+                        username: commentData["username"] as? String ?? "Anonymous",
+                        postId: postId
                     )
                     loadedComments.append(comment)
                 }
@@ -211,6 +270,45 @@ struct ActivityView: View {
             completion(loadedComments.sorted { $0.timestamp < $1.timestamp })
         }
     }
+    
+    private func deleteComment() {
+        guard let comment = commentToDelete else { return }
+        let ref = Database.database().reference().child("comments").child(comment.id)
+        
+        ref.removeValue { error, _ in
+            if let error = error {
+                print("Failed to delete comment: \(error.localizedDescription)")
+            } else {
+                if let postIndex = self.posts.firstIndex(where: { $0.id == comment.postId }) {
+                    self.posts[postIndex].comments.removeAll { $0.id == comment.id }
+                    self.filteredPosts = self.posts
+                }
+            }
+            commentToDelete = nil
+        }
+    }
+    
+    private func deletePost() {
+        guard let post = postToDelete else { return }
+        let postRef = Database.database().reference().child("posts").child(post.id)
+        let storageRef = Storage.storage().reference(forURL: post.imageUrl)
+        
+        postRef.removeValue { error, _ in
+            if let error = error {
+                print("Failed to delete post: \(error.localizedDescription)")
+            } else {
+                storageRef.delete { error in
+                    if let error = error {
+                        print("Failed to delete image: \(error.localizedDescription)")
+                    }
+                }
+                self.posts.removeAll { $0.id == post.id }
+                self.filteredPosts = self.posts
+            }
+            postToDelete = nil
+        }
+    }
+    
     
     private func applyLocationFilter() {
         if searchText.isEmpty {
@@ -228,108 +326,21 @@ struct ActivityView: View {
         }
     }
     
-    func fetchUserData(for userId: String, completion: @escaping (String, String, String, Int) -> Void) {
+    func fetchUserData(for userId: String, completion: @escaping (String, String, String) -> Void) {
         let userRef = Database.database().reference().child("users").child(userId)
         
         userRef.observeSingleEvent(of: .value) { snapshot in
             if let userData = snapshot.value as? [String: Any] {
                 let username = userData["username"] as? String ?? "Unknown User"
                 let email = userData["email"] as? String ?? "No Email"
-                let warningCount = userData["count_warning"] as? Int ?? 0
                 
                 let profileImageRef = Storage.storage().reference().child("users/\(userId)/profile.jpg")
                 profileImageRef.downloadURL { url, _ in
-                    completion(username, email, url?.absoluteString ?? "", warningCount)
+                    completion(username, email, url?.absoluteString ?? "")
                 }
             } else {
-                completion("Unknown User", "No Email", "", 0)
+                completion("Unknown User", "No Email", "")
             }
         }
     }
-}
-
-// Post View for displaying individual posts
-struct PostView: View {
-    var post: AdminPost
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                if let url = URL(string: post.profileImageUrl) {
-                    WebImage(url: url)
-                        .resizable()
-                        .frame(width: 40, height: 40)
-                        .clipShape(Circle())
-                } else {
-                    Image(systemName: "person.circle.fill")
-                        .resizable()
-                        .frame(width: 40, height: 40)
-                }
-
-                VStack(alignment: .leading) {
-                    Text(post.username)
-                        .font(.headline)
-                    Text(post.email)
-                        .font(.caption)
-                        .foregroundColor(.gray)
-                }
-                Spacer()
-            }
-
-            if let url = URL(string: post.imageUrl) {
-                WebImage(url: url)
-                    .resizable()
-                    .scaledToFill()
-                    .frame(height: 200)
-                    .clipped()
-            }
-
-            HStack {
-                Image(systemName: "heart")
-                    .foregroundColor(.gray)
-                Text("\(post.countLike)")
-                    .foregroundColor(.gray)
-                
-                Image(systemName: "message")
-                Text("\(post.countComment)")
-                    .foregroundColor(.gray)
-            }
-
-            Text(post.content)
-                .font(.subheadline)
-            Text(post.location)
-                .font(.caption)
-                .foregroundColor(.gray)
-        }
-    }
-}
-
-// Comment View for displaying individual comments
-struct AdminCommentView: View {
-    var comment: AdminComment
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(comment.username)
-                .font(.headline)
-                .foregroundColor(.blue)
-            Text(comment.content)
-                .font(.body)
-            Text(Date(timeIntervalSince1970: comment.timestamp), style: .time)
-                .font(.caption)
-                .foregroundColor(.gray)
-        }
-        .padding(8)
-        .background(Color(.systemGray6))
-        .cornerRadius(8)
-    }
-}
-
-// Comment model
-struct AdminComment: Identifiable {
-    var id: String
-    var content: String
-    var timestamp: TimeInterval
-    var userId: String
-    var username: String
 }
